@@ -1,0 +1,34 @@
+/* src/components/PillarQuests.css */
+.pillar-quests { text-align: left; }
+.pillar-quests-description { color: #a0b0e0; font-size: 0.95em; margin-bottom: 20px; line-height: 1.6; }
+.pillar-buttons-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px;
+}
+.pillar-quest-button {
+  background-color: rgba(10, 20, 50, 0.7); border: 1px solid var(--pillar-color, #2a3f78);
+  color: #e0e0ff; padding: 15px; border-radius: 6px; cursor: pointer;
+  font-family: 'Roboto', sans-serif; transition: all 0.25s ease-out; text-align: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 100px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); position: relative; overflow: hidden;
+}
+.pillar-quest-button::before {
+    content: ''; position: absolute; top: 50%; left: 50%; width: 0; height: 0;
+    background: radial-gradient(circle, var(--pillar-color, #61dafb) 0%, transparent 70%);
+    border-radius: 50%; transform: translate(-50%, -50%); opacity: 0;
+    transition: width 0.4s ease, height 0.4s ease, opacity 0.4s ease; z-index: 0;
+}
+.pillar-quest-button:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 0 15px var(--pillar-color, #61dafb), 0 4px 8px rgba(0,0,0,0.3);
+  border-color: var(--pillar-color, #61dafb);
+}
+.pillar-quest-button:hover::before { width: 250%; height: 250%; opacity: 0.2; }
+.pillar-quest-button:active { transform: translateY(-1px) scale(1.01); }
+.pillar-quest-button .pillar-icon,
+.pillar-quest-button .pillar-name-button,
+.pillar-quest-button .pillar-level-button { position: relative; z-index: 1; }
+.pillar-quest-button .pillar-icon {
+  font-size: 1.8em; margin-bottom: 8px; filter: drop-shadow(0 0 3px rgba(220, 230, 255, 0.6));
+}
+.pillar-quest-button .pillar-name-button { font-weight: bold; font-size: 1em; margin-bottom: 4px; }
+.pillar-quest-button .pillar-level-button { font-size: 0.85em; color: #88c0f3; }

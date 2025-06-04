@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0a0f1e" />
+    <meta
+      name="description"
+      content="Solo Leveling Themed To-Do List & Life RPG"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>System Interface | Personal Progression</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        background-color: #0a0f1e;
+        color: #c0c0ff;
+        margin: 0;
+        font-family: 'Roboto', sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        text-align: center;
+      }
+      .loading-message {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 1.5em;
+        color: #61dafb;
+        text-shadow: 0 0 10px #61dafb;
+        animation: pulseLoading 1.5s infinite ease-in-out;
+      }
+      @keyframes pulseLoading {
+        0%, 100% { opacity: 0.7; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.05); }
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>
+      <div style="font-family: 'Orbitron', sans-serif; font-size: 1.2em; padding: 20px;">
+        [CRITICAL ERROR] JavaScript is required to activate the System Interface. Please enable it in your browser settings.
+      </div>
+    </noscript>
+    <div id="root">
+      <div class="loading-message">
+        [INITIALIZING SYSTEM INTERFACE...]
+      </div>
+    </div>
+  </body>
+</html>

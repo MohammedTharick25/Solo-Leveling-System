@@ -1,0 +1,3 @@
+/* src/components/TaskList.css */
+.task-list ul { padding: 0; margin: 0; list-style: none; }
+.no-tasks-message { color: #7a8fb8; font-style: italic; text-align: center; padding: 20px 0; }

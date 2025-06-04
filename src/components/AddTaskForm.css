@@ -1,0 +1,51 @@
+/* src/components/AddTaskForm.css */
+.add-task-form { display: flex; flex-direction: column; gap: 15px; }
+.form-row {
+  display: flex; flex-direction: column; align-items: stretch; gap: 10px;
+}
+.task-input, .type-select, .xp-input { width: 100%; box-sizing: border-box; }
+.add-task-form label {
+  font-weight: bold; color: #a0b0e0; margin-bottom: 5px; text-align: left;
+}
+.add-button { align-self: flex-start; background-color: #5cb85c; border-color: #4cae4c; }
+.add-button:hover { background-color: #4cae4c; border-color: #398439; box-shadow: 0 0 10px #5cb85c; }
+
+.form-row.type-xp-penalty-row {
+  flex-direction: column; /* Stack on mobile */
+  gap: 10px;
+}
+.form-row.type-xp-penalty-row > div {
+  display: flex;
+  flex-direction: column; /* Stack label and input within each group */
+}
+.form-row.type-xp-penalty-row > div label {
+  margin-bottom: 5px;
+}
+.form-row.type-xp-penalty-row > div select,
+.form-row.type-xp-penalty-row > div input {
+  width: 100%; /* Full width input on mobile */
+}
+
+@media (min-width: 768px) { /* Adjust breakpoint for horizontal layout */
+  .form-row { flex-direction: row; align-items: center; gap: 10px; }
+  .add-task-form label { margin-bottom: 0; margin-right: 5px; }
+  .task-input { flex-grow: 1; width: auto; }
+  
+  .form-row.type-xp-penalty-row {
+    flex-direction: row; /* Horizontal on larger screens */
+    align-items: flex-end; /* Align items to bottom for better look with labels on top */
+    gap: 15px;
+  }
+  .form-row.type-xp-penalty-row > div {
+    flex-direction: column; /* Keep label on top of input */
+    align-items: flex-start;
+  }
+  .form-row.type-xp-penalty-row > div select,
+  .form-row.type-xp-penalty-row > div input {
+    width: auto; /* Allow natural width or set fixed */
+    min-width: 80px; /* Example min-width */
+  }
+  .type-select { min-width: 130px; }
+  .xp-input { max-width: 80px; }
+  .penalty-input { max-width: 100px; }
+}

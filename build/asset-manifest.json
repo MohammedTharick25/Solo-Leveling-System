@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/solo-levelling-system/static/css/main.a3e675ae.css",
+    "main.js": "/solo-levelling-system/static/js/main.37d70810.js",
+    "static/js/453.89b9cf29.chunk.js": "/solo-levelling-system/static/js/453.89b9cf29.chunk.js",
+    "index.html": "/solo-levelling-system/index.html",
+    "main.a3e675ae.css.map": "/solo-levelling-system/static/css/main.a3e675ae.css.map",
+    "main.37d70810.js.map": "/solo-levelling-system/static/js/main.37d70810.js.map",
+    "453.89b9cf29.chunk.js.map": "/solo-levelling-system/static/js/453.89b9cf29.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.a3e675ae.css",
+    "static/js/main.37d70810.js"
+  ]
+}

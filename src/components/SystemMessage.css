@@ -1,0 +1,29 @@
+/* src/components/SystemMessage.css */
+.system-message {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  padding: 15px 25px; border-radius: 8px; font-family: 'Orbitron', sans-serif;
+  font-size: 1.1em; z-index: 1000; opacity: 0;
+  transition: opacity 0.5s ease-in-out, bottom 0.5s ease-in-out, transform 0.5s ease-in-out;
+  box-shadow: 0 0 15px rgba(0,0,0,0.3); display: flex; align-items: center;
+  max-width: 90%; text-align: center;
+}
+.system-message.visible { opacity: 1; bottom: 40px; transform: translateX(-50%) scale(1); }
+.system-message .message-icon { margin-right: 10px; font-size: 1.2em; }
+.system-message.info { background-color: #2a3f78; color: #c0c0ff; border: 1px solid #4a6fcc; }
+.system-message.success {
+  background-color: #1e4620; color: #a0d8a3; border: 1px solid #3c8d3f;
+  text-shadow: 0 0 5px #5cb85c;
+}
+.system-message.error { /* Style for HP loss messages */
+  background-color: #5c2321; color: #f5c6cb; border: 1px solid #c0392b;
+  text-shadow: 0 0 5px #e74c3c;
+}
+.system-message.levelup {
+  background: linear-gradient(45deg, #ffcc00, #ff9900); color: #332200;
+  border: 1px solid #ffc107; font-weight: bold; animation: levelUpPulse 1.5s infinite alternate;
+  text-shadow: 0 0 8px #fff;
+}
+@keyframes levelUpPulse {
+  from { box-shadow: 0 0 10px #ffcc00, 0 0 20px #ffcc00; }
+  to { box-shadow: 0 0 20px #ff9900, 0 0 30px #ff9900; }
+}

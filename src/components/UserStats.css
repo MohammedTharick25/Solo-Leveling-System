@@ -1,0 +1,48 @@
+/* src/components/UserStats.css */
+.user-stats { text-align: left; }
+.stat-item {
+  margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+  font-size: 1em; padding: 6px 0; border-bottom: 1px dashed #1a2b4a;
+}
+.stat-item:last-of-type { border-bottom: none; }
+.stat-label { color: #88c0f3; font-weight: bold; margin-right: 10px; white-space: nowrap; }
+.stat-value { color: #e0e0ff; text-align: right; overflow-wrap: break-word; word-break: break-word; }
+.level-value { color: #61dafb; font-weight: bold; font-size: 1.2em; text-shadow: 0 0 5px #61dafb;}
+.name-editable { cursor: pointer; text-decoration: underline dotted #61dafb; transition: color 0.2s;}
+.name-editable:hover { color: #82eaff; }
+
+.xp-bar-container.main-xp-bar { height: 22px; border-radius: 6px; margin-top: 8px; }
+.xp-bar-container.main-xp-bar .xp-bar-fill { line-height: 22px; font-size: 0.9em; }
+
+.stat-item.hp-stat-item { margin-top: 15px; }
+.stat-label.hp-label { color: #ff7675; font-weight: bold; }
+.stat-value.hp-value { color: #fab1a0; font-weight: bold; } /* Adjusted color slightly */
+.xp-bar-container.hp-bar-container {
+  height: 20px; border-radius: 5px; margin-top: 5px;
+  background-color: #422a2a; border-color: #7c2f2f; /* Darker red border */
+}
+.xp-bar-fill.hp-bar-fill {
+  background: linear-gradient(90deg, #e74c3cdd, #c0392bcc) !important; /* Ensure override if needed */
+  box-shadow: 0 0 8px #e74c3c inset, 0 0 5px #e74c3c;
+  line-height: 20px; font-size: 0.9em;
+}
+
+.pillar-title {
+  font-family: 'Orbitron', sans-serif; color: #99ccff; font-size: 1.4em;
+  margin-top: 25px; margin-bottom: 15px; border-top: 2px solid #2a3f78;
+  padding-top: 15px; text-align: center; text-shadow: 0 0 8px #4a6fcc;
+}
+.pillar-stat-group {
+  margin-bottom: 18px; padding: 12px; background-color: rgba(0,0,0,0.15);
+  border-radius: 5px; border: 1px solid #152035; transition: background-color 0.3s, box-shadow 0.3s;
+}
+.pillar-stat-group:hover { background-color: rgba(10,25,55,0.25); box-shadow: 0 0 8px rgba(0,0,0,0.2); }
+.stat-item.pillar-stat-item, .stat-item.pillar-xp-item {
+  padding: 4px 0; margin-bottom: 6px; border-bottom-color: #101828;
+}
+.stat-label.pillar-label { font-weight: bold; font-size: 1.05em; display: flex; align-items: center; }
+.stat-label.pillar-label .pillar-icon { margin-right: 8px; font-size: 1.1em; display: inline-block; line-height: 1;}
+.stat-value.pillar-level-value { color: #a0d8ff; font-weight: bold; font-size: 1.1em; }
+.stat-value.pillar-xp-value { font-size: 0.9em; }
+.xp-bar-container.pillar-xp-bar { height: 14px; border-radius: 4px; margin-top: 4px; }
+.xp-bar-fill.pillar-xp-bar-fill { line-height: 14px; font-size: 0.75em; }
