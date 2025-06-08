@@ -2,7 +2,7 @@
   "name": "solo-leveling-todolist",
   "version": "0.1.0",
   "private": true,
-  "homepage": "#",
+  "homepage": "https://mohammedtharick25.github.io/Solo-Leveling-System/",
   "dependencies": {
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^14.2.0",
