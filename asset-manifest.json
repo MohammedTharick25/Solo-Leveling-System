@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/static/css/main.0eee9f0d.css",
-    "main.js": "/static/js/main.10c4efa2.js",
-    "static/js/453.bf2714cc.chunk.js": "/static/js/453.bf2714cc.chunk.js",
-    "index.html": "/index.html",
-    "main.0eee9f0d.css.map": "/static/css/main.0eee9f0d.css.map",
-    "main.10c4efa2.js.map": "/static/js/main.10c4efa2.js.map",
-    "453.bf2714cc.chunk.js.map": "/static/js/453.bf2714cc.chunk.js.map"
+    "main.css": "/Solo-Leveling-System/static/css/main.0eee9f0d.css",
+    "main.js": "/Solo-Leveling-System/static/js/main.6e56cc1c.js",
+    "static/js/453.bf2714cc.chunk.js": "/Solo-Leveling-System/static/js/453.bf2714cc.chunk.js",
+    "index.html": "/Solo-Leveling-System/index.html",
+    "main.0eee9f0d.css.map": "/Solo-Leveling-System/static/css/main.0eee9f0d.css.map",
+    "main.6e56cc1c.js.map": "/Solo-Leveling-System/static/js/main.6e56cc1c.js.map",
+    "453.bf2714cc.chunk.js.map": "/Solo-Leveling-System/static/js/453.bf2714cc.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.0eee9f0d.css",
-    "static/js/main.10c4efa2.js"
+    "static/js/main.6e56cc1c.js"
   ]
 }
