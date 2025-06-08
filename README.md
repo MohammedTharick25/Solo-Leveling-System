@@ -47,25 +47,27 @@ This project is a dynamic, interactive to-do list built with React for the front
 
 ## Project Structure
 
+```
 solo-levelling-todolist/
-├── public/ # Static assets, index.html, manifest.json
+├── public/               # Static assets, index.html, manifest.json
 ├── src/
-│ ├── components/ # Reusable React components
-│ │ ├── AddTaskForm.js
-│ │ ├── PillarQuests.js
-│ │ ├── SystemMessage.js
-│ │ ├── TaskItem.js
-│ │ ├── TaskList.js
-│ │ └── UserStats.js
-│ ├── App.css # Main application styles
-│ ├── App.js # Main application component and logic
-│ ├── config.js # Configuration (XP, HP, task definitions)
-│ ├── index.css # Global styles
-│ ├── index.js # Entry point of the React application
-│ └── reportWebVitals.js
-├── .gitignore # Specifies intentionally untracked files
-├── package.json # Project metadata and dependencies
-└── README.md # This file
+│   ├── components/       # Reusable React components
+│   │   ├── AddTaskForm.js
+│   │   ├── PillarQuests.js
+│   │   ├── SystemMessage.js
+│   │   ├── TaskItem.js
+│   │   ├── TaskList.js
+│   │   └── UserStats.js
+│   ├── App.css           # Main application styles
+│   ├── App.js            # Main application component and logic
+│   ├── config.js         # Configuration (XP, HP, task definitions)
+│   ├── index.css         # Global styles
+│   ├── index.js          # Entry point of the React application
+│   └── reportWebVitals.js
+├── .gitignore            # Specifies intentionally untracked files
+├── package.json          # Project metadata and dependencies
+└── README.md             # This file
+```
 
 
 ## Getting Started Locally
