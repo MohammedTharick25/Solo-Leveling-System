@@ -1,6 +1,5 @@
 # Solo Leveling To-Do System
 
-![Solo Leveling System Banner/Logo (Optional)](./public/logo512.png) <!-- Optional: Add a nice banner or logo here -->
 
 **Transform your daily tasks into an epic quest for self-improvement! Inspired by the thrilling "Solo Leveling" manhwa, this web application gamifies your to-do list, allowing you to level up, enhance life pillars, and conquer your goals like a true Hunter (Person).**
 
