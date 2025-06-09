@@ -13,7 +13,9 @@ import {
   INITIAL_PILLAR_XP_FOR_LEVEL_UP, PILLAR_XP_MULTIPLIER,
   PILLAR_DEFINITIONS, initialPillarsState,
   INITIAL_XP_FOR_LEVEL_UP, XP_MULTIPLIER,
-  INITIAL_HP, DAILY_TASK_DEFINITIONS, NUMBER_OF_RANDOM_DAILY_TASKS
+  INITIAL_HP, // HP_REGENERATION_PER_DAY is used directly
+  ALL_TASK_CATEGORIES, // New import for the large task pool
+  NUMBER_OF_RANDOM_DAILY_TASKS
 } from './config';
 
 const getEndOfDay = (date = new Date()) => {
@@ -22,7 +24,7 @@ const getEndOfDay = (date = new Date()) => {
   return endOfDay.toISOString();
 };
 
-const getStartOfToday = () => { // Renamed for clarity
+const getStartOfToday = () => {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
   return startOfDay;
@@ -162,13 +164,13 @@ function App() {
       createdAt: new Date().toISOString(),
       deadline: (taskData.type === 'DAILY' || isSystemGenerated) ? todayDeadline : null,
       isDailySystemGenerated: isSystemGenerated,
-      status: "ACTIVE" // Initial status
+      status: "ACTIVE"
     };
     setTasks(prevTasks => [newTask, ...prevTasks]);
     let message = `New Quest "${taskData.text}" accepted!`;
     if (newTask.mainXp > 0) message += ` [+${newTask.mainXp} Main XP]`;
-    if (newTask.pillarKey && newTask.pillarXp > 0) {
-        const pillarName = user.pillars[newTask.pillarKey]?.name || 'Pillar';
+    if (newTask.pillarKey && newTask.pillarXp > 0 && user.pillars[newTask.pillarKey]) {
+        const pillarName = user.pillars[newTask.pillarKey].name;
         message += ` [+${newTask.pillarXp} ${pillarName} XP]`;
     }
     showSystemMessage(message, 'info');
@@ -180,9 +182,9 @@ function App() {
         if (task.id === taskId && !task.completed) {
           let message = `Quest "${task.text}" COMPLETED!`;
           if (task.mainXp > 0) { gainXp(task.mainXp); message += ` +${task.mainXp} Main XP`; }
-          if (task.pillarKey && task.pillarXp > 0) {
+          if (task.pillarKey && task.pillarXp > 0 && user.pillars[task.pillarKey]) {
             gainPillarXp(task.pillarKey, task.pillarXp);
-            const pillarName = user.pillars[task.pillarKey]?.name || 'Pillar';
+            const pillarName = user.pillars[task.pillarKey].name;
             if (task.mainXp > 0) message += `,`;
             message += ` +${task.pillarXp} ${pillarName} XP`;
           }
@@ -202,8 +204,8 @@ function App() {
   
   const generatePillarQuest = (pillarKey) => {
     const pillarDef = PILLAR_DEFINITIONS[pillarKey];
-    if (!pillarDef || pillarDef.tasks.length === 0) {
-      showSystemMessage(`No quest templates available for ${pillarDef.name} pillar.`, 'info'); return;
+    if (!pillarDef || !pillarDef.tasks || pillarDef.tasks.length === 0) { // Added pillarDef.tasks check
+      showSystemMessage(`No quest templates available for ${pillarDef?.name || pillarKey} pillar.`, 'info'); return;
     }
     const randomTaskTemplate = pillarDef.tasks[Math.floor(Math.random() * pillarDef.tasks.length)];
     addTask(
@@ -214,28 +216,64 @@ function App() {
 
   const generateRandomDailyTasks = useCallback(() => {
     const todayStr = new Date().toISOString().split('T')[0];
-    const existingSystemDailiesToday = tasks.filter(
+    const existingSystemDailiesTodayCount = tasks.filter(
       task => task.isDailySystemGenerated && task.deadline && task.deadline.startsWith(todayStr)
     ).length;
 
-    if (existingSystemDailiesToday > 0) return;
+    if (existingSystemDailiesTodayCount >= NUMBER_OF_RANDOM_DAILY_TASKS) {
+        return;
+    }
 
-    let generatedCount = 0;
-    const availableTasks = [...DAILY_TASK_DEFINITIONS];
-    while (generatedCount < NUMBER_OF_RANDOM_DAILY_TASKS && availableTasks.length > 0) {
-      const randomIndex = Math.floor(Math.random() * availableTasks.length);
-      const taskTemplate = availableTasks.splice(randomIndex, 1)[0];
-      addTask({ ...taskTemplate, type: 'DAILY' }, taskTemplate.pillarKey, true);
-      generatedCount++;
+    let generatedTasksCount = existingSystemDailiesTodayCount;
+    const allPossibleTasks = [];
+    for (const categoryKey in ALL_TASK_CATEGORIES) {
+        const category = ALL_TASK_CATEGORIES[categoryKey];
+        category.tasks.forEach(taskText => {
+            allPossibleTasks.push({
+                text: taskText,
+                categoryKey: categoryKey,
+                pillarKey: category.pillarKey,
+                mainXp: category.baseMainXp,
+                pillarXp: category.basePillarXp,
+                penaltyHp: category.basePenaltyHp,
+            });
+        });
     }
-    if(generatedCount > 0) {
-        showSystemMessage(`${generatedCount} new Daily Directives received! Check your log.`, 'info', 4000);
+
+    for (let i = allPossibleTasks.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allPossibleTasks[i], allPossibleTasks[j]] = [allPossibleTasks[j], allPossibleTasks[i]];
     }
-  }, [tasks, addTask, showSystemMessage]); // addTask is from App scope, no need to list sub-dependencies if addTask itself is stable
+    
+    let tasksAddedThisRun = 0;
+    for (const taskTemplate of allPossibleTasks) {
+        if (generatedTasksCount >= NUMBER_OF_RANDOM_DAILY_TASKS) {
+            break; 
+        }
+        if (!tasks.some(t => t.text === taskTemplate.text && t.isDailySystemGenerated && t.deadline && t.deadline.startsWith(todayStr))) {
+            addTask(
+                {
+                    text: taskTemplate.text,
+                    type: 'DAILY',
+                    mainXp: taskTemplate.mainXp,
+                    pillarXp: taskTemplate.pillarXp,
+                    penaltyHp: taskTemplate.penaltyHp,
+                },
+                taskTemplate.pillarKey,
+                true
+            );
+            generatedTasksCount++;
+            tasksAddedThisRun++;
+        }
+    }
+
+    if (tasksAddedThisRun > 0) {
+        showSystemMessage(`${tasksAddedThisRun} new Daily Directives received! Check your log.`, 'info', 4000);
+    }
+  }, [tasks, addTask, showSystemMessage]); // addTask and showSystemMessage are from App scope
 
   const processDailyReset = useCallback(() => {
     const todayDateStr = getStartOfToday().toISOString().split('T')[0];
-    // console.log("[SYSTEM] Checking daily reset. Last login:", user.lastLoginDate, "Today:", todayDateStr);
 
     if (user.lastLoginDate !== todayDateStr) {
       showSystemMessage("A new day has begun! System recalibrating...", "info", 4000);
@@ -251,7 +289,8 @@ function App() {
           return { ...task, status: "PENALIZED" };
         }
         return task;
-      }).filter(task => !(task.status === "PENALIZED" && task.isDailySystemGenerated && new Date(task.deadline) < startOfThisDay)); // Remove old penalized system dailies
+      // Filter out old penalized system dailies. Keep user-added penalized tasks.
+      }).filter(task => !(task.status === "PENALIZED" && task.isDailySystemGenerated && new Date(task.deadline) < startOfThisDay)); 
 
       setTasks(updatedTasks);
 
@@ -259,19 +298,20 @@ function App() {
         takeDamage(totalPenalty);
       }
 
-      healHp(user.maxHp); // Full heal for simplicity
-      generateRandomDailyTasks();
+      healHp(user.maxHp); 
+      generateRandomDailyTasks(); // This will generate up to the NUMBER_OF_RANDOM_DAILY_TASKS
       setUser(prevUser => ({ ...prevUser, lastLoginDate: todayDateStr }));
       showSystemMessage("Vitality restored. New daily directives assigned!", "success", 4000);
     } else {
+      // If it's the same day, still try to generate dailies if none exist (e.g. first load of the day)
       const hasSystemDailiesToday = tasks.some(
           task => task.isDailySystemGenerated && task.deadline && task.deadline.startsWith(todayDateStr)
       );
       if (!hasSystemDailiesToday) {
-          generateRandomDailyTasks();
+          generateRandomDailyTasks(); // This will generate up to the NUMBER_OF_RANDOM_DAILY_TASKS
       }
     }
-  }, [user.lastLoginDate, tasks, setTasks, takeDamage, healHp, generateRandomDailyTasks, setUser, showSystemMessage]);
+  }, [user.lastLoginDate, user.maxHp, tasks, setTasks, takeDamage, healHp, generateRandomDailyTasks, setUser, showSystemMessage]);
 
   useEffect(() => {
     processDailyReset();
