@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/Solo-Leveling-System/static/css/main.0eee9f0d.css",
-    "main.js": "/Solo-Leveling-System/static/js/main.6e56cc1c.js",
+    "main.js": "/Solo-Leveling-System/static/js/main.a80e61da.js",
     "static/js/453.bf2714cc.chunk.js": "/Solo-Leveling-System/static/js/453.bf2714cc.chunk.js",
     "index.html": "/Solo-Leveling-System/index.html",
     "main.0eee9f0d.css.map": "/Solo-Leveling-System/static/css/main.0eee9f0d.css.map",
-    "main.6e56cc1c.js.map": "/Solo-Leveling-System/static/js/main.6e56cc1c.js.map",
+    "main.a80e61da.js.map": "/Solo-Leveling-System/static/js/main.a80e61da.js.map",
     "453.bf2714cc.chunk.js.map": "/Solo-Leveling-System/static/js/453.bf2714cc.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.0eee9f0d.css",
-    "static/js/main.6e56cc1c.js"
+    "static/js/main.a80e61da.js"
   ]
 }
