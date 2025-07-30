@@ -68,10 +68,15 @@ npm run build
 # Screenshots
 
 ![Status Report](status%20report.png)
+
 ![Life Pillar Matrix](life%20pillar%20matrix.png)
+
 ![New Quest](new%20quest%20directive.png)
+
 ![Pillar Directives](pillar%20directives.png)
+
 ![Daily Directives](daily%20directives.png)
+
 ![Completed and Abandon Quests](last%20pic.png)
 
 
