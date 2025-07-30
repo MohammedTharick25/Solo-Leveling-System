@@ -62,11 +62,17 @@ npm install
 # 3. Start the development server
 npm run dev
 
-#. Build for Production
+# 4. Build for Production
 npm run build
 
 # Screenshots
 
+![Status Report](./status-report.png)
+![Life Pillar Matrix](./life-pillar-matrix.png)
+![New Quest](./new-quest-directive.png)
+![Pillar Directives](./pillar-directives.png)
+![Daily Directives](./daily-directives.png)
+![Completed and Abandon Quests](./last.png)
 
 
 # Tech Stack
