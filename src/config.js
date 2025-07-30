@@ -268,8 +268,5 @@ export const ALL_TASK_CATEGORIES = {
         basePillarXp: 10,
         basePenaltyHp: 4,
     }
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> d308ccfa65182614c4de15a53893b82fb8fdda6b
+
