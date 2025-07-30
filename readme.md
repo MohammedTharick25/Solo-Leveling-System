@@ -85,5 +85,5 @@ Inspired by the Solo Leveling webtoon and built for anyone who wants to level up
 This project is licensed under the MIT License.
 
 # Author
-Mohammed Tharick
+## Mohammed Tharick
 GitHub
