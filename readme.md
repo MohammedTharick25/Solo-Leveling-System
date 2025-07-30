@@ -67,12 +67,12 @@ npm run build
 
 # Screenshots
 
-![Status Report](./status-report.png)
-![Life Pillar Matrix](./life-pillar-matrix.png)
-![New Quest](./new-quest-directive.png)
-![Pillar Directives](./pillar-directives.png)
-![Daily Directives](./daily-directives.png)
-![Completed and Abandon Quests](./last.png)
+![Status Report](status-report.png)
+![Life Pillar Matrix](life-pillar-matrix.png)
+![New Quest](new-quest-directive.png)
+![Pillar Directives](pillar-directives.png)
+![Daily Directives](daily-directives.png)
+![Completed and Abandon Quests](last.png)
 
 
 # Tech Stack
