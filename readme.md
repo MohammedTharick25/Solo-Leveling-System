@@ -65,7 +65,7 @@ npm run dev
 # 4. Build for Production
 npm run build
 
-## Screenshots
+# Screenshots
 
 ![Status Report](status%20report.png)
 ![Life Pillar Matrix](life%20pillar%20matrix.png)
