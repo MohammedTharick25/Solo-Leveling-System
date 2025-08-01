@@ -3,86 +3,100 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <!-- <meta name="viewport" content="width=device-width, initial-scale=1" /> -->
-
-    <meta name="viewport" content="width=1280, user-scalable=no" />
-
+    
+    <!-- LOCK viewport and disable zoom -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
     <meta name="theme-color" content="#0a0f1e" />
-    <meta
-      name="description"
-      content="Solo Leveling Themed To-Do List & Life RPG"
-    />
+    <meta name="description" content="Solo Leveling Themed To-Do List & Life RPG" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <title>System Interface | Personal Progression</title>
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
     <style>
-        html, body {
-    background-color: #0a0f1e;
-    color: #c0c0ff;
-    margin: 0;
-    font-family: "Roboto", sans-serif;
-    height: 100%;
-    width: 100%;
-    overflow: hidden; /* prevent any scroll shake */
-  }
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: #0a0f1e;
+        height: 100%;
+        width: 100%;
+        font-family: "Roboto", sans-serif;
+        color: #c0c0ff;
+      }
 
-  body {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
+      #app-wrapper {
+        width: 1280px;
+        height: 720px;
+        transform-origin: top left;
+        background-color: #0a0f1e;
+        overflow: hidden;
+      }
 
-  .container {
-    width: 1280px;         /* Fixed width */
-    height: 100vh;         /* Full height */
-    box-sizing: border-box;
-    overflow: hidden;
-  }
+      #root {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
 
-  #root {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
+      .loading-message {
+        font-family: "Orbitron", sans-serif;
+        font-size: 1.5em;
+        color: #61dafb;
+        text-shadow: 0 0 10px #61dafb;
+        animation: pulseLoading 1.5s infinite ease-in-out;
+      }
 
-  .loading-message {
-    font-family: "Orbitron", sans-serif;
-    font-size: 1.5em;
-    color: #61dafb;
-    text-shadow: 0 0 10px #61dafb;
-    animation: pulseLoading 1.5s infinite ease-in-out;
-    margin-top: 30vh;
-  }
-
-  @keyframes pulseLoading {
-    0%, 100% {
-      opacity: 0.7;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 1;
-      transform: scale(1.05);
-    }
-  }
+      @keyframes pulseLoading {
+        0%, 100% {
+          opacity: 0.7;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.05);
+        }
+      }
     </style>
   </head>
+
   <body>
-    <div class = container>
-    <noscript>
-      <div style="font-family: 'Orbitron', sans-serif; font-size: 1.2em; padding: 20px;">
-        [CRITICAL ERROR] JavaScript is required to activate the System Interface. Please enable it in your browser settings.
-      </div>
-    </noscript>
-    <div id="root">
-      <div class="loading-message">
-        [INITIALIZING SYSTEM INTERFACE...]
+    <div id="app-wrapper">
+      <noscript>
+        <div style="font-family: 'Orbitron', sans-serif; font-size: 1.2em; padding: 20px;">
+          [CRITICAL ERROR] JavaScript is required to activate the System Interface. Please enable it in your browser settings.
+        </div>
+      </noscript>
+
+      <div id="root">
+        <div class="loading-message">
+          [INITIALIZING SYSTEM INTERFACE...]
+        </div>
       </div>
     </div>
-      </div>
+
+    <script>
+      function scaleApp() {
+        const baseWidth = 1280;
+        const baseHeight = 720;
+        const scaleX = window.innerWidth / baseWidth;
+        const scaleY = window.innerHeight / baseHeight;
+        const scale = Math.min(scaleX, scaleY); // maintain aspect ratio
+
+        const wrapper = document.getElementById("app-wrapper");
+        wrapper.style.transform = `scale(${scale})`;
+      }
+
+      window.addEventListener("resize", scaleApp);
+      window.addEventListener("load", scaleApp);
+    </script>
   </body>
 </html>
