@@ -31,6 +31,12 @@
         display: block; /* Remove the flex centering */
         text-align: center;
       }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
 
       #root {
         min-height: 100vh;
@@ -63,6 +69,7 @@
     </style>
   </head>
   <body>
+    <div class = container>
     <noscript>
       <div style="font-family: 'Orbitron', sans-serif; font-size: 1.2em; padding: 20px;">
         [CRITICAL ERROR] JavaScript is required to activate the System Interface. Please enable it in your browser settings.
@@ -73,5 +80,6 @@
         [INITIALIZING SYSTEM INTERFACE...]
       </div>
     </div>
+      </div>
   </body>
 </html>
