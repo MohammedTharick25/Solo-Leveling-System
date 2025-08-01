@@ -3,100 +3,53 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    
-    <!-- LOCK viewport and disable zoom -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0a0f1e" />
-    <meta name="description" content="Solo Leveling Themed To-Do List & Life RPG" />
+    <meta
+      name="description"
+      content="Solo Leveling Themed To-Do List & Life RPG"
+    />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <title>System Interface | Personal Progression</title>
-
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-
     <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
+      body {
         background-color: #0a0f1e;
-        height: 100%;
-        width: 100%;
-        font-family: "Roboto", sans-serif;
         color: #c0c0ff;
-      }
-
-      #app-wrapper {
-        width: 1280px;
-        height: 720px;
-        transform-origin: top left;
-        background-color: #0a0f1e;
-        overflow: hidden;
-      }
-
-      #root {
-        width: 100%;
-        height: 100%;
+        margin: 0;
+        font-family: 'Roboto', sans-serif;
         display: flex;
-        flex-direction: column;
-        align-items: center;
         justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        text-align: center;
       }
-
       .loading-message {
-        font-family: "Orbitron", sans-serif;
+        font-family: 'Orbitron', sans-serif;
         font-size: 1.5em;
         color: #61dafb;
         text-shadow: 0 0 10px #61dafb;
         animation: pulseLoading 1.5s infinite ease-in-out;
       }
-
       @keyframes pulseLoading {
-        0%, 100% {
-          opacity: 0.7;
-          transform: scale(1);
-        }
-        50% {
-          opacity: 1;
-          transform: scale(1.05);
-        }
+        0%, 100% { opacity: 0.7; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.05); }
       }
     </style>
   </head>
-
   <body>
-    <div id="app-wrapper">
-      <noscript>
-        <div style="font-family: 'Orbitron', sans-serif; font-size: 1.2em; padding: 20px;">
-          [CRITICAL ERROR] JavaScript is required to activate the System Interface. Please enable it in your browser settings.
-        </div>
-      </noscript>
-
-      <div id="root">
-        <div class="loading-message">
-          [INITIALIZING SYSTEM INTERFACE...]
-        </div>
+    <noscript>
+      <div style="font-family: 'Orbitron', sans-serif; font-size: 1.2em; padding: 20px;">
+        [CRITICAL ERROR] JavaScript is required to activate the System Interface. Please enable it in your browser settings.
+      </div>
+    </noscript>
+    <div id="root">
+      <div class="loading-message">
+        [INITIALIZING SYSTEM INTERFACE...]
       </div>
     </div>
-
-    <script>
-      function scaleApp() {
-        const baseWidth = 1280;
-        const baseHeight = 720;
-        const scaleX = window.innerWidth / baseWidth;
-        const scaleY = window.innerHeight / baseHeight;
-        const scale = Math.min(scaleX, scaleY); // maintain aspect ratio
-
-        const wrapper = document.getElementById("app-wrapper");
-        wrapper.style.transform = `scale(${scale})`;
-      }
-
-      window.addEventListener("resize", scaleApp);
-      window.addEventListener("load", scaleApp);
-    </script>
   </body>
 </html>
