@@ -7,14 +7,11 @@ import {
   Search,
   Tag,
   Star,
-  Archive,
-  ExternalLink,
   Trash2,
+  ExternalLink,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import api from "../../lib/api.js";
-import KnowledgeGraph from "./KnowledgeGraph.jsx";
-
 import {
   pageVariants,
   staggerContainer,
@@ -24,12 +21,10 @@ import {
   SectionHeader,
   EmptyState,
   Button,
-  Badge,
   Modal,
   Input,
 } from "../../components/ui/PageLoader.jsx";
-
-const TABS = ["notes", "graph"];
+import KnowledgeGraph from "./KnowledgeGraph.jsx";
 
 const NOTE_TYPES = [
   "note",
@@ -63,17 +58,13 @@ const TYPE_COLORS = {
 };
 
 export default function BrainPage() {
+  const [mainTab, setMainTab] = useState("notes");
   const [createModal, setCreateModal] = useState(false);
   const [viewNote, setViewNote] = useState(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const queryClient = useQueryClient();
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm();
+  const { register, handleSubmit, reset } = useForm();
 
   const { data, isLoading } = useQuery({
     queryKey: ["brain-notes", typeFilter],
@@ -111,6 +102,7 @@ export default function BrainPage() {
       reset();
       queryClient.invalidateQueries({ queryKey: ["brain-notes"] });
       queryClient.invalidateQueries({ queryKey: ["brain-tags"] });
+      queryClient.invalidateQueries({ queryKey: ["brain-graph"] });
     },
   });
 
@@ -119,6 +111,7 @@ export default function BrainPage() {
     onSuccess: () => {
       setViewNote(null);
       queryClient.invalidateQueries({ queryKey: ["brain-notes"] });
+      queryClient.invalidateQueries({ queryKey: ["brain-graph"] });
     },
   });
 
@@ -130,8 +123,6 @@ export default function BrainPage() {
 
   const notes = search.length >= 2 ? searchData?.notes || [] : data?.data || [];
 
-  const [mainTab, setMainTab] = useState("notes");
-
   return (
     <motion.div
       variants={pageVariants}
@@ -139,7 +130,8 @@ export default function BrainPage() {
       animate="animate"
       exit="exit"
     >
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <p className="text-system mb-1">Knowledge Vault</p>
           <h1 className="font-heading font-bold text-2xl text-slate-100">
@@ -150,146 +142,138 @@ export default function BrainPage() {
           <Plus size={14} /> New Note
         </Button>
       </div>
+
       {/* Main tabs */}
       <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setMainTab("notes")}
-          className={`px-4 py-2 rounded-lg font-heading text-sm font-semibold border transition-all
-                      ${mainTab === "notes" ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-400" : "border-slate-800 text-slate-500 hover:text-slate-300"}`}
-        >
-          📝 Notes
-        </button>
-        <button
-          onClick={() => setMainTab("graph")}
-          className={`px-4 py-2 rounded-lg font-heading text-sm font-semibold border transition-all
-                      ${mainTab === "graph" ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-400" : "border-slate-800 text-slate-500 hover:text-slate-300"}`}
-        >
-          🕸️ Knowledge Graph
-        </button>
+        {[
+          { id: "notes", label: "📝 Notes" },
+          { id: "graph", label: "🕸️ Knowledge Graph" },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setMainTab(t.id)}
+            className={`px-4 py-2 rounded-lg font-heading text-sm font-semibold border transition-all
+                        ${mainTab === t.id ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-400" : "border-slate-800 text-slate-500 hover:text-slate-300"}`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
+      {/* Knowledge Graph tab */}
       {mainTab === "graph" && (
         <div
-          className="glass rounded-2xl overflow-hidden"
+          className="glass rounded-2xl overflow-hidden border border-slate-700/50"
           style={{ height: "520px" }}
         >
           <KnowledgeGraph
             onNodeClick={(node) => {
-              const found = (data?.data || []).find((n) => n._id === node.id);
+              const found = (data?.data || []).find(
+                (n) =>
+                  n._id === node.id ||
+                  n._id?.toString() === node.id?.toString(),
+              );
               if (found) setViewNote(found);
             }}
           />
         </div>
       )}
+
+      {/* Notes tab */}
       {mainTab === "notes" && (
-        <div className="glass rounded-2xl p-6">
-          {notes.length > 0 && (
-            <p className="font-body text-xs text-slate-500 mb-4">
-              {notes.length} notes found
-            </p>
-          )}
-          {notes.length === 0 && !isLoading && (
-            <EmptyState
-              icon={Archive}
-              title="No notes found"
-              description="You can create notes to capture your ideas, insights, and knowledge."
-              action={
-                <Button variant="primary" onClick={() => setCreateModal(true)}>
-                  <Plus size={14} /> New Note
-                </Button>
-              }
-            />
-          )}
-        </div>
-      )}
-
-      <motion.div
-        variants={staggerContainer}
-        initial="initial"
-        animate="animate"
-        className="space-y-6"
-      >
-        {/* Search + filter bar */}
-        <motion.div variants={staggerItem} className="flex flex-wrap gap-3">
-          <div className="relative flex-1 min-w-48">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
-            />
-            <input
-              className="input pl-9 py-2.5"
-              placeholder="Search notes, ideas, quotes…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <select
-            className="input py-2.5 w-36"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-          >
-            <option value="">All types</option>
-            {NOTE_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {TYPE_EMOJI[t]} {t}
-              </option>
-            ))}
-          </select>
-        </motion.div>
-
-        {/* Tag cloud */}
-        {tagsData?.tags?.length > 0 && (
-          <motion.div variants={staggerItem} className="flex flex-wrap gap-2">
-            {tagsData.tags.slice(0, 15).map(({ tag, count }) => (
-              <button
-                key={tag}
-                onClick={() => setSearch(tag)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800/50
-                           border border-slate-700/50 font-heading text-xs text-slate-400
-                           hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
-              >
-                <Tag size={10} /> {tag}
-                <span className="text-slate-600">·{count}</span>
-              </button>
-            ))}
+        <motion.div
+          variants={staggerContainer}
+          initial="initial"
+          animate="animate"
+          className="space-y-6"
+        >
+          {/* Search + filter */}
+          <motion.div variants={staggerItem} className="flex flex-wrap gap-3">
+            <div className="relative flex-1 min-w-48">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+              />
+              <input
+                className="input pl-9 py-2.5"
+                placeholder="Search notes, ideas, quotes…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <select
+              className="input py-2.5 w-36"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
+              <option value="">All types</option>
+              {NOTE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {TYPE_EMOJI[t]} {t}
+                </option>
+              ))}
+            </select>
           </motion.div>
-        )}
 
-        {/* Notes grid */}
-        <motion.div variants={staggerItem}>
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="skeleton h-40 rounded-xl" />
+          {/* Tag cloud */}
+          {tagsData?.tags?.length > 0 && (
+            <motion.div variants={staggerItem} className="flex flex-wrap gap-2">
+              {tagsData.tags.slice(0, 15).map(({ tag, count }) => (
+                <button
+                  key={tag}
+                  onClick={() => setSearch(tag)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800/50 border border-slate-700/50
+                             font-heading text-xs text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
+                >
+                  <Tag size={10} /> {tag}{" "}
+                  <span className="text-slate-600">·{count}</span>
+                </button>
               ))}
-            </div>
-          ) : notes.length === 0 ? (
-            <EmptyState
-              icon={Brain}
-              title="Your Second Brain is empty"
-              description="Start capturing notes, ideas, and insights to build your personal knowledge base."
-              action={
-                <Button variant="primary" onClick={() => setCreateModal(true)}>
-                  <Plus size={14} /> New Note
-                </Button>
-              }
-            />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {notes.map((note) => (
-                <NoteCard
-                  key={note._id}
-                  note={note}
-                  onClick={() => setViewNote(note)}
-                  onFav={() =>
-                    favMutation.mutate({ id: note._id, val: !note.isFavorite })
-                  }
-                />
-              ))}
-            </div>
+            </motion.div>
           )}
+
+          {/* Notes grid */}
+          <motion.div variants={staggerItem}>
+            {isLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="skeleton h-40 rounded-xl" />
+                ))}
+              </div>
+            ) : notes.length === 0 ? (
+              <EmptyState
+                icon={Brain}
+                title="Your Second Brain is empty"
+                description="Start capturing notes, ideas, and insights."
+                action={
+                  <Button
+                    variant="primary"
+                    onClick={() => setCreateModal(true)}
+                  >
+                    <Plus size={14} /> New Note
+                  </Button>
+                }
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {notes.map((note) => (
+                  <NoteCard
+                    key={note._id}
+                    note={note}
+                    onClick={() => setViewNote(note)}
+                    onFav={() =>
+                      favMutation.mutate({
+                        id: note._id,
+                        val: !note.isFavorite,
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </motion.div>
         </motion.div>
-      </motion.div>
+      )}
 
       {/* Create modal */}
       <Modal
@@ -318,8 +302,7 @@ export default function BrainPage() {
               <Input
                 label="Title"
                 placeholder="Note title…"
-                error={errors.title?.message}
-                {...register("title", { required: "Title required" })}
+                {...register("title", { required: true })}
               />
             </div>
             <div>
@@ -333,9 +316,8 @@ export default function BrainPage() {
               </select>
             </div>
           </div>
-
           <div>
-            <label className="input-label">Content (Markdown supported)</label>
+            <label className="input-label">Content</label>
             <textarea
               rows={6}
               className="input resize-none font-mono text-xs"
@@ -343,19 +325,16 @@ export default function BrainPage() {
               {...register("content")}
             />
           </div>
-
           <Input
             label="Tags (comma separated)"
             placeholder="productivity, notes, ideas"
             {...register("tags")}
           />
-
           <Input
             label="Source / URL (optional)"
             placeholder="https://…"
             {...register("sourceUrl")}
           />
-
           <div className="flex justify-end gap-3 pt-2">
             <Button
               variant="ghost"
@@ -388,28 +367,27 @@ export default function BrainPage() {
         {viewNote && (
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-4">
-              <Badge color="slate">
+              <span className="px-2 py-0.5 rounded bg-slate-800 font-heading text-xs text-slate-400">
                 {TYPE_EMOJI[viewNote.type]} {viewNote.type}
-              </Badge>
+              </span>
               {viewNote.tags?.map((t) => (
-                <Badge key={t} color="cyan">
-                  <Tag size={9} className="mr-0.5" />
-                  {t}
-                </Badge>
+                <span
+                  key={t}
+                  className="px-1.5 py-0.5 rounded bg-slate-800 font-heading text-[10px] text-slate-500"
+                >
+                  #{t}
+                </span>
               ))}
             </div>
-            <div className="prose prose-invert prose-sm max-w-none mb-5">
-              <p className="font-body text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
-                {viewNote.content || "No content."}
-              </p>
-            </div>
+            <p className="font-body text-sm text-slate-300 whitespace-pre-wrap leading-relaxed mb-5">
+              {viewNote.content || "No content."}
+            </p>
             {viewNote.sourceUrl && (
               <a
                 href={viewNote.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 font-heading text-xs text-cyan-400
-                           hover:text-cyan-300 transition-colors mb-5"
+                className="inline-flex items-center gap-1.5 font-heading text-xs text-cyan-400 hover:text-cyan-300 transition-colors mb-5"
               >
                 <ExternalLink size={12} /> View Source
               </a>
@@ -427,11 +405,7 @@ export default function BrainPage() {
                       val: !viewNote.isFavorite,
                     })
                   }
-                  className={`p-2 rounded-lg transition-colors ${
-                    viewNote.isFavorite
-                      ? "text-yellow-400"
-                      : "text-slate-600 hover:text-yellow-400"
-                  }`}
+                  className={`p-2 rounded-lg transition-colors ${viewNote.isFavorite ? "text-yellow-400" : "text-slate-600 hover:text-yellow-400"}`}
                 >
                   <Star
                     size={15}
@@ -459,8 +433,7 @@ function NoteCard({ note, onClick, onFav }) {
       variants={staggerItem}
       whileHover={{ y: -3 }}
       onClick={onClick}
-      className={`glass rounded-xl p-5 cursor-pointer border ${TYPE_COLORS[note.type] || "border-slate-700/50"}
-                  hover:border-opacity-60 transition-all duration-200`}
+      className={`glass rounded-xl p-5 cursor-pointer border ${TYPE_COLORS[note.type] || "border-slate-700/50"} hover:border-opacity-60 transition-all duration-200`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2">
