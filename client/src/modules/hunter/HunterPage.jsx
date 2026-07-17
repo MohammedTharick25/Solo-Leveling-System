@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Trophy, Sparkles, TrendingUp, Calendar } from "lucide-react";
+import { Share2, Copy, Check } from "lucide-react";
+import { useState } from "react";
 import api from "../../lib/api.js";
 import { useHunterStore } from "../../stores/hunterStore.js";
 import {
@@ -20,6 +21,7 @@ import {
   SectionHeader,
   Card,
   Badge,
+  XPBar,
 } from "../../components/ui/PageLoader.jsx";
 
 const ALL_STATS = [
@@ -41,6 +43,7 @@ const ALL_STATS = [
 export default function HunterPage() {
   const { hunter, stats, setHunter } = useHunterStore();
   const queryClient = useQueryClient();
+  const [copied, setCopied] = useState(false);
 
   const { data: futureSelfData } = useQuery({
     queryKey: ["future-self"],
@@ -58,6 +61,23 @@ export default function HunterPage() {
     },
   });
 
+  const handleShare = async () => {
+    const url = `${window.location.origin}/h/${hunter?._id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${hunter?.hunterName} — Solo Leveling`,
+          text: `Check out my Hunter Profile! Level ${hunter?.level} ${hunter?.rank} Rank.`,
+          url,
+        });
+      } catch {}
+    } else {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   if (!hunter) return null;
 
   return (
@@ -67,11 +87,28 @@ export default function HunterPage() {
       animate="animate"
       exit="exit"
     >
-      <div className="mb-8">
-        <p className="text-system mb-1">Hunter Profile</p>
-        <h1 className="font-heading font-bold text-2xl text-slate-100">
-          {hunter.hunterName}
-        </h1>
+      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+        <div>
+          <p className="text-system mb-1">Hunter Profile</p>
+          <h1 className="font-heading font-bold text-2xl text-slate-100">
+            {hunter.hunterName}
+          </h1>
+        </div>
+        {/* Share button */}
+        <button
+          onClick={handleShare}
+          className="btn-secondary flex items-center gap-2 text-sm py-2 px-4"
+        >
+          {copied ? (
+            <>
+              <Check size={14} /> Copied!
+            </>
+          ) : (
+            <>
+              <Share2 size={14} /> Share Profile
+            </>
+          )}
+        </button>
       </div>
 
       <motion.div
@@ -80,13 +117,11 @@ export default function HunterPage() {
         animate="animate"
         className="space-y-6"
       >
-        {/* ── Hunter Card ── */}
+        {/* Hunter Card */}
         <motion.div variants={staggerItem}>
           <div className="glass-cyan rounded-2xl p-8 relative overflow-hidden">
-            {/* Decorative glow */}
             <div className="absolute -top-20 -right-20 w-60 h-60 bg-cyan-500/10 rounded-full blur-3xl" />
             <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-purple-500/10 rounded-full blur-3xl" />
-
             <div className="relative flex flex-col sm:flex-row items-center sm:items-start gap-6">
               <div
                 className="w-24 h-24 rounded-2xl bg-gradient-to-br from-cyan-500/30 to-purple-500/30
@@ -96,7 +131,6 @@ export default function HunterPage() {
                   {hunter.hunterName?.[0]?.toUpperCase()}
                 </span>
               </div>
-
               <div className="flex-1 text-center sm:text-left">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-2">
                   <RankBadge rank={hunter.rank} />
@@ -109,18 +143,15 @@ export default function HunterPage() {
                   Level {hunter.level} · {formatXP(hunter.totalXP)} Total XP ·
                   Power Score {hunter.powerScore}
                 </p>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <XPBar hunter={hunter} className="max-w-xs" />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
                   <StatChip
                     label="Quests Done"
                     value={hunter.totalQuestCompletions}
                   />
+                  <StatChip label="Streak" value={`${hunter.currentStreak}d`} />
                   <StatChip
-                    label="Current Streak"
-                    value={`${hunter.currentStreak}d`}
-                  />
-                  <StatChip
-                    label="Longest Streak"
+                    label="Best Streak"
                     value={`${hunter.longestStreak}d`}
                   />
                   <StatChip
@@ -133,21 +164,53 @@ export default function HunterPage() {
           </div>
         </motion.div>
 
-        {/* ── Titles ── */}
+        {/* Achievements */}
+        {hunter.achievements?.length > 0 && (
+          <motion.div variants={staggerItem}>
+            <SectionHeader
+              label="Hall of Records"
+              title={`Achievements (${hunter.achievements.length})`}
+            />
+            <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-7 gap-3">
+              {hunter.achievements
+                .sort(
+                  (a, b) =>
+                    (({ legendary: 0, epic: 1, rare: 2, common: 3 })[
+                      a.rarity
+                    ] ?? 3) -
+                    ({ legendary: 0, epic: 1, rare: 2, common: 3 }[b.rarity] ??
+                      3),
+                )
+                .map((a) => (
+                  <div
+                    key={a.id}
+                    title={`${a.name}: ${a.description}`}
+                    className={`flex flex-col items-center p-3 rounded-xl border text-center cursor-help
+                                ${a.rarity === "legendary" ? "border-yellow-500/40 bg-yellow-950/20" : a.rarity === "epic" ? "border-purple-500/30 bg-purple-950/15" : a.rarity === "rare" ? "border-blue-500/30 bg-blue-950/15" : "border-slate-700/40 bg-slate-800/20"}`}
+                  >
+                    <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>
+                      {a.icon}
+                    </span>
+                    <p className="font-heading text-[9px] text-slate-500 mt-1.5 leading-tight">
+                      {a.name}
+                    </p>
+                  </div>
+                ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Titles */}
         {hunter.titles?.length > 0 && (
           <motion.div variants={staggerItem}>
-            <SectionHeader label="Achievements" title="Unlocked Titles" />
+            <SectionHeader label="Earned Titles" title="Equip a Title" />
             <div className="flex flex-wrap gap-2">
               {hunter.titles.map((title) => (
                 <button
                   key={title}
                   onClick={() => equipTitleMutation.mutate(title)}
-                  className={`px-4 py-2 rounded-lg font-heading text-sm font-semibold transition-all
-                              border ${
-                                hunter.title === title
-                                  ? "bg-cyan-500/15 border-cyan-500/50 text-cyan-400 shadow-glow-cyan-sm"
-                                  : "bg-slate-800/40 border-slate-700/50 text-slate-400 hover:border-slate-600"
-                              }`}
+                  className={`px-4 py-2 rounded-lg font-heading text-sm font-semibold border transition-all
+                              ${hunter.title === title ? "bg-cyan-500/15 border-cyan-500/50 text-cyan-400 shadow-glow-cyan-sm" : "bg-slate-800/40 border-slate-700/50 text-slate-400 hover:border-slate-600"}`}
                 >
                   {title}
                 </button>
@@ -156,7 +219,7 @@ export default function HunterPage() {
           </motion.div>
         )}
 
-        {/* ── All Life Stats ── */}
+        {/* All Life Stats */}
         <motion.div variants={staggerItem}>
           <Card>
             <SectionHeader label="Character Sheet" title="Life Stats" />
@@ -181,7 +244,7 @@ export default function HunterPage() {
           </Card>
         </motion.div>
 
-        {/* ── Future Self Simulator ── */}
+        {/* Future Self */}
         {futureSelfData?.projections && (
           <motion.div variants={staggerItem}>
             <Card>
@@ -214,6 +277,34 @@ export default function HunterPage() {
             </Card>
           </motion.div>
         )}
+
+        {/* Share card */}
+        <motion.div variants={staggerItem}>
+          <div className="glass rounded-xl p-5 border border-slate-700/50 flex items-center justify-between gap-4">
+            <div>
+              <p className="font-heading font-semibold text-sm text-slate-200 mb-1">
+                Share your Hunter Profile
+              </p>
+              <p className="font-body text-xs text-slate-500">
+                {`${window.location.origin}/h/${hunter?._id}`}
+              </p>
+            </div>
+            <button
+              onClick={handleShare}
+              className="btn-secondary py-2 px-4 text-sm flex items-center gap-2 shrink-0"
+            >
+              {copied ? (
+                <>
+                  <Check size={13} /> Copied!
+                </>
+              ) : (
+                <>
+                  <Copy size={13} /> Copy Link
+                </>
+              )}
+            </button>
+          </div>
+        </motion.div>
       </motion.div>
     </motion.div>
   );
