@@ -46,7 +46,12 @@ app.use(
           "https://res.cloudinary.com",
           "https://img.icons8.com",
         ], // Allow Cloudinary & Icons8
-        connectSrc: ["'self'", "http://localhost:5000", "ws://localhost:5000"],
+        connectSrc: [
+          "'self'",
+          "http://localhost:5000",
+          "https://solo-leveling-system-frontend.onrender.com/",
+          "ws://localhost:5000",
+        ],
       },
     },
     crossOriginResourcePolicy: { policy: "cross-origin" }, // Allows images to be shared across ports
