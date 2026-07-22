@@ -49,7 +49,8 @@ app.use(
         connectSrc: [
           "'self'",
           "http://localhost:5000",
-          "https://solo-leveling-system-frontend.onrender.com/",
+          "https://solo-leveling-system-frontend.onrender.com",
+          "https://solo-leveling-system-backend-we1h.onrender.com",
           "ws://localhost:5000",
         ],
       },
