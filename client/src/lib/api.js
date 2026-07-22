@@ -1,14 +1,15 @@
 import axios from "axios";
 import { useHunterStore } from "../stores/hunterStore.js";
 
+console.log("VITE_API_URL:", import.meta.env.VITE_API_URL);
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1",
   withCredentials: true,
   timeout: 15000,
 });
 
-console.log("VITE_API_URL =", import.meta.env.VITE_API_URL);
-console.log("Axios baseURL =", api.defaults.baseURL);
+console.log("Axios baseURL:", api.defaults.baseURL);
 
 // ── Request interceptor: attach access token ──────────────────────────────
 api.interceptors.response.use(
