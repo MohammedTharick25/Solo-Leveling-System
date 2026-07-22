@@ -7,6 +7,9 @@ const api = axios.create({
   timeout: 15000,
 });
 
+console.log("VITE_API_URL =", import.meta.env.VITE_API_URL);
+console.log("Axios baseURL =", api.defaults.baseURL);
+
 // ── Request interceptor: attach access token ──────────────────────────────
 api.interceptors.response.use(
   (res) => res,
