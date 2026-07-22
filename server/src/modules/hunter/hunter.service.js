@@ -286,12 +286,27 @@ export const checkStreaks = checkAndUpdateStreaks;
 export const updateStreak = updateStreakOnQuestComplete;
 
 export const getHunterProfile = async (userId) => {
-  const [hunter, stats] = await Promise.all([
+  const [hunter, stats, totalHunters] = await Promise.all([
     Hunter.findOne({ userId }).populate("guildId", "name tag"),
     Stats.findOne({ userId }),
+    Hunter.countDocuments(),
   ]);
+
   if (!hunter) throw new AppError("Hunter not found.", 404);
-  return { hunter, stats };
+
+  // Calculate Percentile (e.g., "Top 10%")
+  const higherRanked = await Hunter.countDocuments({
+    totalXP: { $gt: hunter.totalXP },
+  });
+  const percentile =
+    totalHunters > 0
+      ? Math.max(1, Math.round((higherRanked / totalHunters) * 100))
+      : 100;
+
+  return {
+    hunter: { ...hunter.toObject(), percentile },
+    stats,
+  };
 };
 
 export const equipTitle = async (userId, title) => {
