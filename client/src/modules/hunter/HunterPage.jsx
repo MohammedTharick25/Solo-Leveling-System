@@ -1,26 +1,25 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
-import { Share2, Copy, Check } from "lucide-react";
 import { useState } from "react";
-import api from "../../lib/api.js";
+import { motion } from "framer-motion";
+import useSound from "use-sound";
+import CountUp from "react-countup";
+
+// Stores & Logic
 import { useHunterStore } from "../../stores/hunterStore.js";
+import { STAT_LABELS, STAT_COLORS, STAT_ICONS } from "../../lib/xpFormulas.js";
+import { pageVariants } from "../../lib/animations.js";
+
+// Custom UI Components
+import { RankAura } from "../../components/ui/RankAura.jsx";
 import {
-  pageVariants,
-  staggerContainer,
-  staggerItem,
-} from "../../lib/animations.js";
-import {
-  STAT_LABELS,
-  STAT_COLORS,
-  STAT_ICONS,
-  formatXP,
-} from "../../lib/xpFormulas.js";
+  TiltCard,
+  PowerRadar,
+  SystemLog,
+} from "../../components/ui/HunterVisuals.jsx";
 import {
   RankBadge,
   StatBar,
   SectionHeader,
   Card,
-  Badge,
   XPBar,
 } from "../../components/ui/PageLoader.jsx";
 
@@ -41,280 +40,207 @@ const ALL_STATS = [
 ];
 
 export default function HunterPage() {
-  const { hunter, stats, setHunter } = useHunterStore();
-  const queryClient = useQueryClient();
-  const [copied, setCopied] = useState(false);
+  const { hunter, stats } = useHunterStore();
+  const [activeTab, setActiveTab] = useState("overview");
 
-  const { data: futureSelfData } = useQuery({
-    queryKey: ["future-self"],
-    queryFn: async () => {
-      const { data } = await api.get("/hunter/future-self");
-      return data.data;
-    },
-  });
-
-  const equipTitleMutation = useMutation({
-    mutationFn: (title) => api.patch("/hunter/title", { title }),
-    onSuccess: ({ data }) => {
-      setHunter(data.data.hunter);
-      queryClient.invalidateQueries({ queryKey: ["hunter"] });
-    },
-  });
-
-  const handleShare = async () => {
-    const url = `${window.location.origin}/h/${hunter?._id}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `${hunter?.hunterName} — Solo Leveling`,
-          text: `Check out my Hunter Profile! Level ${hunter?.level} ${hunter?.rank} Rank.`,
-          url,
-        });
-      } catch {}
-    } else {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  // NOTE: Ensure you have a click.mp3 in public/sounds/
+  const [playClick] = useSound("/sounds/click.mp3", { volume: 0.1 });
 
   if (!hunter) return null;
 
+  const logs = [
+    { text: "Neural synchronization complete.", type: "system" },
+    { text: `Hunter identified: ${hunter.hunterName}`, type: "system" },
+    { text: "Mana circuits stabilized.", type: "system" },
+    { text: `Current Status: ${hunter.rank} Rank`, type: "gain" },
+  ];
+
   return (
-    <motion.div
-      variants={pageVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-    >
-      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-        <div>
-          <p className="text-system mb-1">Hunter Profile</p>
-          <h1 className="font-heading font-bold text-2xl text-slate-100">
-            {hunter.hunterName}
-          </h1>
-        </div>
-        {/* Share button */}
-        <button
-          onClick={handleShare}
-          className="btn-secondary flex items-center gap-2 text-sm py-2 px-4"
-        >
-          {copied ? (
-            <>
-              <Check size={14} /> Copied!
-            </>
-          ) : (
-            <>
-              <Share2 size={14} /> Share Profile
-            </>
-          )}
-        </button>
-      </div>
+    <div className="relative min-h-screen pb-20">
+      <RankAura rank={hunter.rank} />
 
-      <motion.div
-        variants={staggerContainer}
-        initial="initial"
-        animate="animate"
-        className="space-y-6"
-      >
-        {/* Hunter Card */}
-        <motion.div variants={staggerItem}>
-          <div className="glass-cyan rounded-2xl p-8 relative overflow-hidden">
-            <div className="absolute -top-20 -right-20 w-60 h-60 bg-cyan-500/10 rounded-full blur-3xl" />
-            <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-purple-500/10 rounded-full blur-3xl" />
-            <div className="relative flex flex-col sm:flex-row items-center sm:items-start gap-6">
-              <div
-                className="w-24 h-24 rounded-2xl bg-gradient-to-br from-cyan-500/30 to-purple-500/30
-                              border-2 border-cyan-500/50 shadow-glow-cyan flex items-center justify-center shrink-0"
-              >
-                <span className="font-display text-4xl text-cyan-300">
-                  {hunter.hunterName?.[0]?.toUpperCase()}
-                </span>
-              </div>
-              <div className="flex-1 text-center sm:text-left">
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-2">
-                  <RankBadge rank={hunter.rank} />
-                  <Badge color="purple">{hunter.title}</Badge>
-                </div>
-                <h2 className="font-display text-2xl font-black text-gradient-hero mb-1">
-                  {hunter.hunterName}
-                </h2>
-                <p className="font-heading text-sm text-slate-400 mb-4">
-                  Level {hunter.level} · {formatXP(hunter.totalXP)} Total XP ·
-                  Power Score {hunter.powerScore}
-                </p>
-                <XPBar hunter={hunter} className="max-w-xs" />
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
-                  <StatChip
-                    label="Quests Done"
-                    value={hunter.totalQuestCompletions}
-                  />
-                  <StatChip label="Streak" value={`${hunter.currentStreak}d`} />
-                  <StatChip
-                    label="Best Streak"
-                    value={`${hunter.longestStreak}d`}
-                  />
-                  <StatChip
-                    label="Focus Hours"
-                    value={`${Math.floor((hunter.totalFocusMinutes || 0) / 60)}h`}
-                  />
-                </div>
-              </div>
+      <div className="relative z-10 max-w-7xl mx-auto p-4 lg:p-8">
+        {/* TOP HUD BAR */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-8 bg-slate-900/80 p-4 rounded-2xl border border-white/5 backdrop-blur-xl">
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-cyan-500 font-bold tracking-widest uppercase">
+                Level
+              </span>
+              <span className="text-2xl font-black italic text-white leading-none">
+                <CountUp end={hunter.level} />
+              </span>
             </div>
-          </div>
-        </motion.div>
-
-        {/* Achievements */}
-        {hunter.achievements?.length > 0 && (
-          <motion.div variants={staggerItem}>
-            <SectionHeader
-              label="Hall of Records"
-              title={`Achievements (${hunter.achievements.length})`}
-            />
-            <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-7 gap-3">
-              {hunter.achievements
-                .sort(
-                  (a, b) =>
-                    (({ legendary: 0, epic: 1, rare: 2, common: 3 })[
-                      a.rarity
-                    ] ?? 3) -
-                    ({ legendary: 0, epic: 1, rare: 2, common: 3 }[b.rarity] ??
-                      3),
-                )
-                .map((a) => (
-                  <div
-                    key={a.id}
-                    title={`${a.name}: ${a.description}`}
-                    className={`flex flex-col items-center p-3 rounded-xl border text-center cursor-help
-                                ${a.rarity === "legendary" ? "border-yellow-500/40 bg-yellow-950/20" : a.rarity === "epic" ? "border-purple-500/30 bg-purple-950/15" : a.rarity === "rare" ? "border-blue-500/30 bg-blue-950/15" : "border-slate-700/40 bg-slate-800/20"}`}
-                  >
-                    <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>
-                      {a.icon}
-                    </span>
-                    <p className="font-heading text-[9px] text-slate-500 mt-1.5 leading-tight">
-                      {a.name}
-                    </p>
-                  </div>
-                ))}
-            </div>
-          </motion.div>
-        )}
-
-        {/* Titles */}
-        {hunter.titles?.length > 0 && (
-          <motion.div variants={staggerItem}>
-            <SectionHeader label="Earned Titles" title="Equip a Title" />
-            <div className="flex flex-wrap gap-2">
-              {hunter.titles.map((title) => (
-                <button
-                  key={title}
-                  onClick={() => equipTitleMutation.mutate(title)}
-                  className={`px-4 py-2 rounded-lg font-heading text-sm font-semibold border transition-all
-                              ${hunter.title === title ? "bg-cyan-500/15 border-cyan-500/50 text-cyan-400 shadow-glow-cyan-sm" : "bg-slate-800/40 border-slate-700/50 text-slate-400 hover:border-slate-600"}`}
-                >
-                  {title}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {/* All Life Stats */}
-        <motion.div variants={staggerItem}>
-          <Card>
-            <SectionHeader label="Character Sheet" title="Life Stats" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-              {ALL_STATS.map((key) => (
-                <div key={key}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-heading text-sm text-slate-300 flex items-center gap-1.5">
-                      <span>{STAT_ICONS[key]}</span> {STAT_LABELS[key]}
-                    </span>
-                    <span className="font-display text-xs text-slate-400">
-                      {stats?.[key]?.value || 0}/100
-                    </span>
-                  </div>
-                  <StatBar
-                    value={stats?.[key]?.value || 0}
-                    color={STAT_COLORS[key]}
-                  />
-                </div>
-              ))}
-            </div>
-          </Card>
-        </motion.div>
-
-        {/* Future Self */}
-        {futureSelfData?.projections && (
-          <motion.div variants={staggerItem}>
-            <Card>
-              <SectionHeader
-                label="Predictive System"
-                title="Future Self Simulator"
-              />
-              <p className="font-body text-sm text-slate-500 mb-5">
-                Based on your current pace, here's where you're headed.
-              </p>
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                {futureSelfData.projections.map((p) => (
-                  <div
-                    key={p.daysAhead}
-                    className="glass rounded-xl p-4 text-center"
-                  >
-                    <p className="text-hud mb-2">
-                      {p.daysAhead < 365 ? `${p.daysAhead} Days` : "1 Year"}
-                    </p>
-                    <p className="font-display text-xl font-bold text-gradient-cyan mb-1">
-                      LV.{p.projectedLevel}
-                    </p>
-                    <RankBadge
-                      rank={p.projectedRank}
-                      className="text-[9px] px-1.5 py-0.5"
-                    />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Share card */}
-        <motion.div variants={staggerItem}>
-          <div className="glass rounded-xl p-5 border border-slate-700/50 flex items-center justify-between gap-4">
+            <div className="h-10 w-px bg-slate-700/50" />
             <div>
-              <p className="font-heading font-semibold text-sm text-slate-200 mb-1">
-                Share your Hunter Profile
-              </p>
-              <p className="font-body text-xs text-slate-500">
-                {`${window.location.origin}/h/${hunter?._id}`}
-              </p>
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                Active Title
+              </div>
+              <div className="text-sm text-cyan-100 font-heading">
+                {hunter.title}
+              </div>
             </div>
-            <button
-              onClick={handleShare}
-              className="btn-secondary py-2 px-4 text-sm flex items-center gap-2 shrink-0"
-            >
-              {copied ? (
-                <>
-                  <Check size={13} /> Copied!
-                </>
-              ) : (
-                <>
-                  <Copy size={13} /> Copy Link
-                </>
-              )}
-            </button>
           </div>
+
+          <div className="flex bg-black/40 p-1 rounded-xl border border-slate-800">
+            {["overview", "stats", "records"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => {
+                  playClick();
+                  setActiveTab(tab);
+                }}
+                className={`px-4 lg:px-8 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                  activeTab === tab
+                    ? "bg-cyan-600 text-white shadow-glow-cyan-sm"
+                    : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <motion.div
+          key={activeTab}
+          variants={pageVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+        >
+          {/* OVERVIEW TAB */}
+          {activeTab === "overview" && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              <div className="lg:col-span-4 space-y-6">
+                <TiltCard>
+                  <div className="glass-cyan p-8 rounded-3xl border border-cyan-500/20 text-center relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 text-4xl opacity-10 font-black italic">
+                      {hunter.rank[0]}
+                    </div>
+                    <div className="w-24 h-24 bg-gradient-to-br from-cyan-500 to-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center text-4xl shadow-glow-cyan">
+                      {hunter.hunterName[0].toUpperCase()}
+                    </div>
+                    <h2 className="text-2xl font-display font-bold text-white mb-2 tracking-tight">
+                      {hunter.hunterName}
+                    </h2>
+                    <RankBadge rank={hunter.rank} />
+                    <div className="mt-8">
+                      <XPBar hunter={hunter} />
+                    </div>
+                  </div>
+                </TiltCard>
+                <SystemLog events={logs} />
+              </div>
+
+              <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit">
+                <SummaryCard
+                  label="Power Score"
+                  value={<CountUp end={hunter.powerScore} />}
+                  desc="Combined combat effectiveness"
+                />
+                <SummaryCard
+                  label="Global Percentile"
+                  value={`Top ${hunter.percentile || 1}%`}
+                  desc="Standing among all hunters"
+                />
+                <SummaryCard
+                  label="Quest Mastery"
+                  value={hunter.totalQuestCompletions}
+                  desc="Total successful missions"
+                />
+                <SummaryCard
+                  label="Active Streak"
+                  value={`${hunter.currentStreak} Days`}
+                  desc="Bonus multiplier active"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* STATS TAB */}
+          {activeTab === "stats" && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <Card className="bg-slate-900/60 backdrop-blur-md">
+                <SectionHeader
+                  title="Ability Radar"
+                  label="Mana Distribution"
+                />
+                <PowerRadar stats={stats} />
+              </Card>
+              <Card className="bg-slate-900/60 backdrop-blur-md">
+                <SectionHeader
+                  title="Physical & Mental Attributes"
+                  label="Soul Stats"
+                />
+                <div className="grid grid-cols-1 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                  {ALL_STATS.map((key) => (
+                    <div key={key} className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-bold uppercase">
+                        <span className="text-slate-400 flex items-center gap-2">
+                          <span>{STAT_ICONS[key]}</span> {STAT_LABELS[key]}
+                        </span>
+                        <span className="text-cyan-400">
+                          {stats?.[key]?.value || 0}%
+                        </span>
+                      </div>
+                      <StatBar
+                        value={stats?.[key]?.value || 0}
+                        color={STAT_COLORS[key]}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* RECORDS TAB */}
+          {activeTab === "records" && (
+            <div className="space-y-8">
+              <SectionHeader
+                title="Hall of Records"
+                label="Achievements Unlocked"
+              />
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {hunter.achievements?.length > 0 ? (
+                  hunter.achievements.map((a) => (
+                    <div
+                      key={a.id}
+                      className={`p-4 rounded-xl border text-center transition-all hover:scale-105 bg-slate-900/40 ${a.rarity === "legendary" ? "border-yellow-500/50 shadow-glow-yellow-sm" : "border-slate-800"}`}
+                    >
+                      <div className="text-3xl mb-2">{a.icon || "🏆"}</div>
+                      <div className="text-[10px] font-black uppercase text-white truncate">
+                        {a.name}
+                      </div>
+                      <div className="text-[9px] text-slate-500 mt-1 uppercase tracking-tighter">
+                        {a.rarity}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full py-20 text-center text-slate-600 font-display italic">
+                    No records found in the system archives.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </motion.div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 
-function StatChip({ label, value }) {
+// Helper component for Overview cards
+function SummaryCard({ label, value, desc }) {
   return (
-    <div className="bg-slate-900/40 rounded-lg p-3 text-center sm:text-left">
-      <p className="text-hud text-[9px] mb-1">{label}</p>
-      <p className="font-display text-lg text-slate-100">{value}</p>
+    <div className="bg-slate-900/40 border border-white/5 p-6 rounded-2xl backdrop-blur-sm">
+      <h4 className="text-cyan-500 text-[10px] font-black uppercase tracking-[0.2em] mb-4">
+        {label}
+      </h4>
+      <p className="text-4xl font-display font-bold text-white mb-2">{value}</p>
+      <p className="text-slate-500 text-xs tracking-tight">{desc}</p>
     </div>
   );
 }
