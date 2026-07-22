@@ -32,7 +32,26 @@ import achievementRoutes from "./modules/achievements/achievement.routes.js";
 const app = express();
 
 // ── Security ─────────────────────────────────────────────────────────────────
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "https://res.cloudinary.com",
+          "https://img.icons8.com",
+        ], // Allow Cloudinary & Icons8
+        connectSrc: ["'self'", "http://localhost:5000", "ws://localhost:5000"],
+      },
+    },
+    crossOriginResourcePolicy: { policy: "cross-origin" }, // Allows images to be shared across ports
+  }),
+);
 app.use(
   cors({
     origin: config.CLIENT_URL,

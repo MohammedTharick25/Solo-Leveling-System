@@ -8,13 +8,19 @@ const api = axios.create({
 });
 
 // ── Request interceptor: attach access token ──────────────────────────────
-api.interceptors.request.use(
-  (config) => {
-    const token = useHunterStore.getState().token;
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
+api.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const original = error.config;
+
+    // ONLY retry if status is 401. If it's 403 or 500, DO NOT RETRY/REFRESH.
+    if (error.response?.status === 401 && !original._retry) {
+      // ... keep existing refresh logic ...
+    }
+
+    // If it's a 500 or 403, just reject it so the UI can show the error
+    return Promise.reject(error);
   },
-  (err) => Promise.reject(err),
 );
 
 // ── Response interceptor: handle 401 / token refresh ─────────────────────

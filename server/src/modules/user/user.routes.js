@@ -3,6 +3,7 @@ import { body } from "express-validator";
 import userController from "./user.controller.js";
 import { protect } from "../../middleware/auth.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
+import { upload } from "../../lib/cloudinary.js";
 
 const router = Router();
 
@@ -19,6 +20,12 @@ router.patch(
     validate,
   ],
   userController.updateMe,
+);
+
+router.patch(
+  "/me/avatar",
+  upload.single("avatar"),
+  userController.updateAvatar,
 );
 
 router.patch(

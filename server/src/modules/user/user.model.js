@@ -15,6 +15,14 @@ const awakeningSchema = new mongoose.Schema({
     type: String,
     enum: ["sedentary", "light", "moderate", "active", "athlete"],
   },
+  avatar: {
+    url: {
+      type: String,
+      default:
+        "https://res.cloudinary.com/demo/image/upload/v1631711732/avatar-placeholder.png",
+    },
+    public_id: { type: String },
+  },
   learningInterests: [String],
   currentHabits: [String],
   biggestWeaknesses: [String],
