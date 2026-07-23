@@ -70,7 +70,7 @@ export default function CalendarPage() {
   // 3. DEFENSIVE DATA MAPPING
   // This ensures that even if the API returns something weird, the app won't crash
   const safeRaids = Array.isArray(raidsData) ? raidsData : [];
-  const safeQuests = Array.isArray(questsData) ? questsData : [];
+  const safeQuests = Array.isArray(todaysQuests) ? todaysQuests : [];
 
   const wkDays = Array.from({ length: 7 }, (_, i) => addD(wkStart, i));
   const isToday = (d) => same(d, today);
