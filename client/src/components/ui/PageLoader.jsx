@@ -144,7 +144,7 @@ export function Modal({
 }
 
 // ── Page Loader ───────────────────────────────────────────────────────────────
-export default function PageLoader() {
+export function PageLoader() {
   return (
     <div className="flex items-center justify-center h-64">
       <div className="text-center">

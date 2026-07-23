@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useHunterStore } from '../stores/hunterStore.js';
 import AppShell from '../components/layout/AppShell.jsx';
-import PageLoader from '../components/ui/PageLoader.jsx';
+import { PageLoader } from '../components/ui/PageLoader.jsx';
 import ErrorBoundary from '../components/ui/ErrorBoundary.jsx';
 import LoginPage     from '../modules/auth/LoginPage.jsx';
 import RegisterPage  from '../modules/auth/RegisterPage.jsx';
