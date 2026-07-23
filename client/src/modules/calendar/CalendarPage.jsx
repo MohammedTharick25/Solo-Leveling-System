@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Clock, Target, Scroll } from "lucide-react";
@@ -10,6 +10,8 @@ import {
 } from "../../lib/animations.js";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Date Helper Functions
 const sow = (d) => {
   const x = new Date(d);
   x.setDate(x.getDate() - x.getDay());
@@ -31,32 +33,38 @@ export default function CalendarPage() {
   const today = new Date();
   const wkEnd = addD(wkStart, 6);
 
+  // 1. Fetch Raids with a unique key and safe data extraction
   const { data: raidsData } = useQuery({
-    queryKey: ["raids-cal"],
+    queryKey: ["calendar-raids-list"],
     queryFn: async () => {
       const response = await api.get("/raids?limit=100");
-      // Safety: extract the array regardless of whether it's in response.data.data or response.data
-      const raids = response.data?.data?.raids || response.data?.raids || [];
+      // Extract from data.data.raids based on your JSON response
+      const raids = response.data?.data?.raids || [];
       return Array.isArray(raids) ? raids : [];
     },
-    initialData: [], // Start with an empty array to prevent undefined issues
+    initialData: [],
   });
 
+  // 2. Fetch Quests with a unique key and safe data extraction
   const { data: questsData } = useQuery({
-    queryKey: ["quests"],
+    queryKey: ["calendar-quests-list"],
     queryFn: async () => {
       const response = await api.get("/quests");
-      const quests = response.data?.data?.quests || response.data?.quests || [];
+      // Extract from data.data.quests based on your JSON response
+      const quests = response.data?.data?.quests || [];
       return Array.isArray(quests) ? quests : [];
     },
-    initialData: [], // Start with an empty array
+    initialData: [],
   });
+
+  // 3. DEFENSIVE DATA MAPPING
+  // This ensures that even if the API returns something weird, the app won't crash
+  const safeRaids = Array.isArray(raidsData) ? raidsData : [];
+  const safeQuests = Array.isArray(questsData) ? questsData : [];
 
   const wkDays = Array.from({ length: 7 }, (_, i) => addD(wkStart, i));
   const isToday = (d) => same(d, today);
   const isPast = (d) => d < today && !same(d, today);
-  const safeRaids = Array.isArray(raidsData) ? raidsData : [];
-  const safeQuests = Array.isArray(questsData) ? questsData : [];
 
   const raidsForDay = (d) =>
     safeRaids.filter((r) => r.dueAt && same(new Date(r.dueAt), d));
@@ -71,7 +79,10 @@ export default function CalendarPage() {
 
   const fmt = () => {
     const o = { month: "short", day: "numeric" };
-    return `${wkStart.toLocaleDateString("en", o)} – ${wkEnd.toLocaleDateString("en", o)}, ${wkEnd.getFullYear()}`;
+    return `${wkStart.toLocaleDateString("en", o)} – ${wkEnd.toLocaleDateString(
+      "en",
+      o,
+    )}, ${wkEnd.getFullYear()}`;
   };
 
   return (
@@ -118,14 +129,26 @@ export default function CalendarPage() {
           {wkDays.map((d, i) => (
             <div
               key={i}
-              className={`p-3 text-center border-r border-slate-800/40 last:border-r-0 ${isToday(d) ? "bg-cyan-500/10" : isPast(d) ? "bg-slate-900/30" : ""}`}
+              className={`p-3 text-center border-r border-slate-800/40 last:border-r-0 ${
+                isToday(d)
+                  ? "bg-cyan-500/10"
+                  : isPast(d)
+                    ? "bg-slate-900/30"
+                    : ""
+              }`}
             >
               <p className="font-heading text-[10px] text-slate-500 uppercase tracking-widest mb-1">
                 {DAYS[d.getDay()]}
               </p>
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center mx-auto font-display text-sm font-bold
-                ${isToday(d) ? "bg-cyan-500 text-slate-950 shadow-glow-cyan-sm" : isPast(d) ? "text-slate-600" : "text-slate-200"}`}
+                ${
+                  isToday(d)
+                    ? "bg-cyan-500 text-slate-950 shadow-glow-cyan-sm"
+                    : isPast(d)
+                      ? "text-slate-600"
+                      : "text-slate-200"
+                }`}
               >
                 {d.getDate()}
               </div>
@@ -139,7 +162,9 @@ export default function CalendarPage() {
             return (
               <div
                 key={i}
-                className={`border-r border-slate-800/40 last:border-r-0 p-2 space-y-1 ${isToday(d) ? "bg-cyan-500/5" : isPast(d) ? "opacity-50" : ""}`}
+                className={`border-r border-slate-800/40 last:border-r-0 p-2 space-y-1 ${
+                  isToday(d) ? "bg-cyan-500/5" : isPast(d) ? "opacity-50" : ""
+                }`}
               >
                 {dQ.length > 0 && (
                   <div className="mb-2">
@@ -149,20 +174,23 @@ export default function CalendarPage() {
                     {dQ.slice(0, 4).map((q) => (
                       <div
                         key={q._id}
-                        className={`px-1.5 py-1 rounded-md mb-0.5 border-l-2 ${q.status === "completed" ? "border-emerald-500 bg-emerald-500/10 opacity-60" : "border-cyan-500 bg-cyan-500/10"}`}
+                        className={`px-1.5 py-1 rounded-md mb-0.5 border-l-2 ${
+                          q.status === "completed"
+                            ? "border-emerald-500 bg-emerald-500/10 opacity-60"
+                            : "border-cyan-500 bg-cyan-500/10"
+                        }`}
                       >
                         <p
-                          className={`font-heading text-[9px] truncate ${q.status === "completed" ? "text-slate-500 line-through" : "text-cyan-300"}`}
+                          className={`font-heading text-[9px] truncate ${
+                            q.status === "completed"
+                              ? "text-slate-500 line-through"
+                              : "text-cyan-300"
+                          }`}
                         >
                           {q.title}
                         </p>
                       </div>
                     ))}
-                    {dQ.length > 4 && (
-                      <p className="font-body text-[9px] text-slate-600 pl-1">
-                        +{dQ.length - 4} more
-                      </p>
-                    )}
                   </div>
                 )}
                 {dR.map((r) => {
@@ -180,21 +208,25 @@ export default function CalendarPage() {
                   return (
                     <div
                       key={r._id}
-                      className={`px-1.5 py-1 rounded-md border-l-2 mb-0.5 ${dn ? "border-emerald-500 bg-emerald-500/10 opacity-50" : ov ? "border-red-500 bg-red-500/10" : `${PB[r.priority] || "border-slate-600"} bg-purple-500/10`}`}
+                      className={`px-1.5 py-1 rounded-md border-l-2 mb-0.5 ${
+                        dn
+                          ? "border-emerald-500 bg-emerald-500/10 opacity-50"
+                          : ov
+                            ? "border-red-500 bg-red-500/10"
+                            : `${PB[r.priority] || "border-slate-600"} bg-purple-500/10`
+                      }`}
                     >
                       <p
-                        className={`font-heading text-[9px] truncate ${dn ? "text-slate-500 line-through" : ov ? "text-red-300" : "text-purple-300"}`}
+                        className={`font-heading text-[9px] truncate ${
+                          dn
+                            ? "text-slate-500 line-through"
+                            : ov
+                              ? "text-red-300"
+                              : "text-purple-300"
+                        }`}
                       >
                         {r.title}
                       </p>
-                      {r.dueAt && !dn && (
-                        <p className="font-body text-[8px] text-slate-600">
-                          {new Date(r.dueAt).toLocaleTimeString("en", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      )}
                     </div>
                   );
                 })}
@@ -204,6 +236,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      {/* Legend */}
       <div className="flex flex-wrap gap-4 mt-4">
         {[
           ["bg-cyan-500/60", "Daily Quests"],
@@ -218,6 +251,7 @@ export default function CalendarPage() {
         ))}
       </div>
 
+      {/* Stats Cards */}
       <motion.div
         variants={staggerContainer}
         initial="initial"
@@ -227,7 +261,6 @@ export default function CalendarPage() {
         {[
           {
             label: "Quests Today",
-            // Use safeQuests here
             value: `${safeQuests.filter((q) => q.status === "completed").length}/${safeQuests.length}`,
             icon: <Scroll size={14} className="text-cyan-400" />,
             color: "text-cyan-400",
