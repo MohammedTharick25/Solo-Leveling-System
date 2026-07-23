@@ -184,26 +184,46 @@ function WeeklyReportCard({ report }) {
   const trendColor = report.productivityTrend === 'rising' ? 'text-emerald-400'
     : report.productivityTrend === 'declining' ? 'text-red-400' : 'text-yellow-400';
 
+  const handleDownload = () => {
+    window.print(); // Browser print generates high-quality PDF if CSS is set
+  };
+
   return (
     <Card>
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex justify-between items-start mb-6">
         <div>
-          <p className="text-system mb-1">Hunter Report</p>
-          <p className="font-body text-xs text-slate-500">
-            Week of {new Date(report.weekStart).toLocaleDateString()} — {new Date(report.weekEnd).toLocaleDateString()}
+          <h2 className="font-display text-2xl font-black text-gradient-hero print:text-black">
+            HUNTER PROGRESS REPORT
+          </h2>
+          <p className="font-heading text-slate-500 uppercase tracking-widest text-xs">
+            Sector: Performance Intelligence
           </p>
         </div>
-        <Badge color={report.productivityTrend === 'rising' ? 'emerald' : report.productivityTrend === 'declining' ? 'red' : 'yellow'}>
-          {report.productivityTrend?.toUpperCase()}
-        </Badge>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleDownload}
+          className="print:hidden"
+        >
+          Download PDF
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Quest Completion', value: `${Math.round((report.questCompletionRate || 0) * 100)}%` },
-          { label: 'Total XP', value: (report.totalXPEarned || 0).toLocaleString() },
-          { label: 'Focus Minutes', value: `${report.totalFocusMinutes || 0}m` },
-          { label: 'Streak', value: `${report.streakPerformance || 0}d` },
+          {
+            label: "Quest Completion",
+            value: `${Math.round((report.questCompletionRate || 0) * 100)}%`,
+          },
+          {
+            label: "Total XP",
+            value: (report.totalXPEarned || 0).toLocaleString(),
+          },
+          {
+            label: "Focus Minutes",
+            value: `${report.totalFocusMinutes || 0}m`,
+          },
+          { label: "Streak", value: `${report.streakPerformance || 0}d` },
         ].map(({ label, value }) => (
           <div key={label} className="glass rounded-xl p-4 text-center">
             <p className="text-hud mb-1">{label}</p>
@@ -216,12 +236,17 @@ function WeeklyReportCard({ report }) {
         <div className="glass rounded-xl p-4">
           <p className="text-hud mb-2">Most Improved</p>
           <p className="font-heading font-semibold text-sm text-emerald-400">
-            {report.mostImprovedStat} {report.mostImprovedStatDelta > 0 ? `+${report.mostImprovedStatDelta}` : ''}
+            {report.mostImprovedStat}{" "}
+            {report.mostImprovedStatDelta > 0
+              ? `+${report.mostImprovedStatDelta}`
+              : ""}
           </p>
         </div>
         <div className="glass rounded-xl p-4">
           <p className="text-hud mb-2">Suggested Focus</p>
-          <p className="font-heading font-semibold text-sm text-yellow-400">{report.suggestedFocusArea}</p>
+          <p className="font-heading font-semibold text-sm text-yellow-400">
+            {report.suggestedFocusArea}
+          </p>
         </div>
       </div>
 
@@ -238,6 +263,21 @@ function WeeklyReportCard({ report }) {
           </ul>
         </div>
       )}
+      <div className="space-y-6">
+        <div className="border-l-2 border-cyan-500 pl-4">
+          <h4 className="font-heading font-bold text-slate-200 print:text-black">
+            Executive Summary
+          </h4>
+          <p className="font-body text-sm text-slate-400 mt-2 leading-relaxed">
+            Your productivity trend is{" "}
+            <span className="text-emerald-400 font-bold uppercase">
+              {report.productivityTrend}
+            </span>
+            . The System has detected major growth in{" "}
+            <span className="text-slate-100">{report.mostImprovedStat}</span>.
+          </p>
+        </div>
+      </div>
     </Card>
   );
 }

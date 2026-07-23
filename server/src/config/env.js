@@ -13,7 +13,7 @@ const config = {
   JWT_REFRESH_SECRET:
     process.env.JWT_REFRESH_SECRET ||
     "change-this-refresh-secret-in-production",
-  JWT_ACCESS_EXPIRY: "15m",
+  JWT_ACCESS_EXPIRY: "7d",
   JWT_REFRESH_EXPIRY: "7d",
 
   RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000,

@@ -67,12 +67,15 @@ export default function BrainPage() {
   const { register, handleSubmit, reset } = useForm();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["brain-notes", typeFilter],
+    queryKey: ["brain-notes", typeFilter || "all"], // Use "all" as key if empty
     queryFn: async () => {
+      // If typeFilter is empty, don't send the param at all
       const params = typeFilter ? `?type=${typeFilter}` : "";
-      const { data } = await api.get(`/brain${params}`);
-      return data.data;
+      const response = await api.get(`/brain${params}`);
+      return response.data.data;
     },
+    // Add this to prevent UI flicker
+    keepPreviousData: true,
   });
 
   const { data: searchData } = useQuery({

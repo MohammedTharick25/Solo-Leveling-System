@@ -46,10 +46,10 @@ const RANK_INSIGNIAS = {
     "https://res.cloudinary.com/di5reah7g/image/upload/v1784732149/F_Rank_gzgzmy.png",
   E: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/E_Rank_ljcatr.png",
   D: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/D_Rank_ofo1x0.png",
-  C: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/C_Rank_kqjvqj.png",
-  B: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/B_Rank_zkqjzk.png",
-  A: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/A_Rank_qjzqjz.png",
-  S: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/S_Rank_qjzqjz.png",
+  C: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/C_Rank_cjbn89.png",
+  B: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/B_Rank_yce5fe.png",
+  A: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732085/A_Rank_c0pwnx.png",
+  S: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732085/S_Rank_ursozu.png",
   National:
     "https://res.cloudinary.com/di5reah7g/image/upload/v1784733748/National_Rank_btbfmm.png",
   Monarch:

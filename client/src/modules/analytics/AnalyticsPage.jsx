@@ -630,19 +630,40 @@ function Heatmap({ data, year }) {
     if (s >= 40) return "bg-cyan-700";
     return "bg-cyan-900/60";
   };
+  const MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   return (
-    <div className="flex gap-1">
-      {weeks.map((wk, wi) => (
-        <div key={wi} className="flex flex-col gap-1">
-          {wk.map((day, di) => (
-            <div
-              key={di}
-              title={day.date + (day.score ? ` · Score: ${day.score}` : "")}
-              className={`w-3 h-3 rounded-sm ${getColor(day.score)} transition-opacity hover:opacity-80 cursor-default`}
-            />
-          ))}
-        </div>
-      ))}
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-[3.1rem] pl-2 mb-1">
+        {MONTHS.map(m => (
+          <span key={m} className="font-heading text-[10px] text-slate-600 uppercase tracking-tighter w-4">{m}</span>
+        ))}
+      </div>
+      <div className="flex gap-1">
+        {weeks.map((wk, wi) => (
+          <div key={wi} className="flex flex-col gap-1">
+            {wk.map((day, di) => (
+              <div
+                key={di}
+                title={day.date + (day.score ? ` · Score: ${day.score}` : "")}
+                className={`w-3 h-3 rounded-sm ${getColor(day.score)} transition-opacity hover:opacity-80 cursor-default`}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Ghost, Lock } from "lucide-react";
+import { Ghost, Lock, Info, HelpCircle } from "lucide-react";
 import api from "../../lib/api.js";
 import {
   pageVariants,
@@ -11,7 +11,10 @@ import {
   SectionHeader,
   EmptyState,
   Badge,
+  Modal,
+  Button,
 } from "../../components/ui/PageLoader.jsx";
+
 
 const SHADOW_TYPE_INFO = {
   discipline: {
@@ -110,15 +113,66 @@ export default function ShadowsPage() {
       animate="animate"
       exit="exit"
     >
-      <div className="mb-8">
-        <p className="text-system mb-1">The Abyss</p>
-        <h1 className="font-heading font-bold text-2xl text-slate-100">
-          Shadow Army
-        </h1>
-        <p className="font-body text-sm text-slate-500 mt-1">
-          {shadows.length} of {ALL_SHADOW_TYPES.length} shadows extracted
-        </p>
+      <div className="flex justify-between items-start mb-8">
+        <div>
+          <p className="text-system mb-1">The Abyss</p>
+          <h1 className="font-heading font-bold text-2xl text-slate-100">
+            Shadow Army
+          </h1>
+        </div>
+        <button
+          onClick={() => setInfoModal(true)}
+          className="p-2 rounded-full bg-slate-800 text-cyan-400 hover:bg-slate-700 transition-all"
+        >
+          <HelpCircle size={20} />
+        </button>
       </div>
+
+      {/* Shadow Info Modal */}
+      <Modal
+        open={infoModal}
+        onClose={() => setInfoModal(false)}
+        title="System Intel: Shadow Army"
+      >
+        <div className="space-y-4 font-body text-sm text-slate-300">
+          <p>
+            Shadows are manifestations of your mastered skills. Once extracted,
+            they provide{" "}
+            <span className="text-cyan-400 font-bold">Passive Buffs</span> to
+            your character.
+          </p>
+          <div className="space-y-2">
+            <div className="p-3 bg-slate-900 rounded-lg border border-slate-700">
+              <p className="font-heading text-cyan-400 font-bold uppercase text-xs mb-1">
+                Extraction
+              </p>
+              <p>
+                Achieve specific milestones (e.g., 7-day streaks, 10 focus
+                sessions) to unlock a new Shadow.
+              </p>
+            </div>
+            <div className="p-3 bg-slate-900 rounded-lg border border-slate-700">
+              <p className="font-heading text-purple-400 font-bold uppercase text-xs mb-1">
+                Evolution
+              </p>
+              <p>
+                Shadows gain XP when you complete quests in their category. They
+                evolve through 4 ranks:{" "}
+                <span className="italic text-slate-100">
+                  Initiate → Elite → Commander → Monarch.
+                </span>
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="primary"
+            className="w-full"
+            onClick={() => setInfoModal(false)}
+          >
+            Understood
+          </Button>
+        </div>
+      </Modal>
 
       {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

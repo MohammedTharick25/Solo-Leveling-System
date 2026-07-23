@@ -44,9 +44,12 @@ export default function AchievementsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["achievements"],
     queryFn: async () => {
-      const { data } = await api.get("/achievements");
-      return data.data;
+      const response = await api.get("/achievements");
+      // Explicitly return the content inside data.data
+      return response.data.data;
     },
+    retry: 1,
+    staleTime: 5000,
   });
 
   const checkMutation = useMutation({
@@ -62,7 +65,19 @@ export default function AchievementsPage() {
       (a, b) => (RARITY_ORDER[a.rarity] ?? 3) - (RARITY_ORDER[b.rarity] ?? 3),
     );
 
+  // Check if loading or if we have no data
+  if (isLoading) return <PageLoader />;
+
+  if (isError)
+    return (
+      <EmptyState
+        title="System Link Interrupted"
+        description="Failed to retrieve achievements."
+      />
+    );
+
   const unlocked = sort(data?.unlocked || []);
+
   const locked = sort(data?.locked || []);
   const total = data?.total || 0;
   const pct = total > 0 ? Math.round((unlocked.length / total) * 100) : 0;

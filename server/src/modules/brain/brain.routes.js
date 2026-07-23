@@ -18,7 +18,7 @@ export const getNotes = async (
   { type, tags, isFavorite, isArchived, page = 1, limit = 20 } = {},
 ) => {
   const query = { userId };
-  if (type) query.type = type;
+  if (type && type !== "" && type !== "all") query.type = type;
   if (tags) query.tags = { $in: Array.isArray(tags) ? tags : [tags] };
   if (isFavorite !== undefined) query.isFavorite = isFavorite === "true";
   if (isArchived !== undefined) query.isArchived = isArchived === "true";
