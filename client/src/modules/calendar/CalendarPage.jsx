@@ -34,26 +34,36 @@ export default function CalendarPage() {
   const { data: raidsData } = useQuery({
     queryKey: ["raids-cal"],
     queryFn: async () => {
-      const { data } = await api.get("/raids?limit=100");
-      return data.data.raids || [];
+      const response = await api.get("/raids?limit=100");
+      // Safety: extract the array regardless of whether it's in response.data.data or response.data
+      const raids = response.data?.data?.raids || response.data?.raids || [];
+      return Array.isArray(raids) ? raids : [];
     },
+    initialData: [], // Start with an empty array to prevent undefined issues
   });
+
   const { data: questsData } = useQuery({
     queryKey: ["quests"],
     queryFn: async () => {
-      const { data } = await api.get("/quests");
-      console.log(data);
-      return data.data.quests || [];
+      const response = await api.get("/quests");
+      const quests = response.data?.data?.quests || response.data?.quests || [];
+      return Array.isArray(quests) ? quests : [];
     },
+    initialData: [], // Start with an empty array
   });
 
   const wkDays = Array.from({ length: 7 }, (_, i) => addD(wkStart, i));
   const isToday = (d) => same(d, today);
   const isPast = (d) => d < today && !same(d, today);
+  const safeRaids = Array.isArray(raidsData) ? raidsData : [];
+  const safeQuests = Array.isArray(questsData) ? questsData : [];
+
   const raidsForDay = (d) =>
-    (raidsData || []).filter((r) => r.dueAt && same(new Date(r.dueAt), d));
-  const questsForDay = (d) => (same(d, today) ? questsData || [] : []);
-  const weekRaids = (raidsData || []).filter((r) => {
+    safeRaids.filter((r) => r.dueAt && same(new Date(r.dueAt), d));
+
+  const questsForDay = (d) => (same(d, today) ? safeQuests : []);
+
+  const weekRaids = safeRaids.filter((r) => {
     if (!r.dueAt) return false;
     const d = new Date(r.dueAt);
     return d >= wkStart && d <= wkEnd;
@@ -217,7 +227,8 @@ export default function CalendarPage() {
         {[
           {
             label: "Quests Today",
-            value: `${(questsData || []).filter((q) => q.status === "completed").length}/${(questsData || []).length}`,
+            // Use safeQuests here
+            value: `${safeQuests.filter((q) => q.status === "completed").length}/${safeQuests.length}`,
             icon: <Scroll size={14} className="text-cyan-400" />,
             color: "text-cyan-400",
           },
