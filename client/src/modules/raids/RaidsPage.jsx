@@ -66,12 +66,14 @@ export default function RaidsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey:['raids'] }),
   });
 
+
   const completeMutation = useMutation({
     mutationFn: (id) => api.patch(`/raids/${id}/complete`),
     onSuccess: () => {
       playQuestComplete();
-      queryClient.invalidateQueries({ queryKey:['raids'] });
-      queryClient.invalidateQueries({ queryKey:['hunter'] });
+      // This forces the UI to re-fetch the streak and XP immediately
+      queryClient.invalidateQueries({ queryKey: ['hunter'] });
+      queryClient.invalidateQueries({ queryKey: ['raids'] });
     },
   });
 

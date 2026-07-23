@@ -33,29 +33,39 @@ export default function CalendarPage() {
   const today = new Date();
   const wkEnd = addD(wkStart, 6);
 
-  // 1. Fetch Raids with a unique key and safe data extraction
+  // 1. Fetch Raids
   const { data: raidsData } = useQuery({
     queryKey: ["calendar-raids-list"],
     queryFn: async () => {
       const response = await api.get("/raids?limit=100");
-      // Extract from data.data.raids based on your JSON response
-      const raids = response.data?.data?.raids || [];
-      return Array.isArray(raids) ? raids : [];
+      return response.data?.data?.raids || [];
     },
-    initialData: [],
   });
 
-  // 2. Fetch Quests with a unique key and safe data extraction
-  const { data: questsData } = useQuery({
-    queryKey: ["calendar-quests-list"],
+  // 2. Fetch Today's Quests
+  const { data: todaysQuests } = useQuery({
+    queryKey: ["calendar-quests-today"],
     queryFn: async () => {
       const response = await api.get("/quests");
-      // Extract from data.data.quests based on your JSON response
-      const quests = response.data?.data?.quests || [];
-      return Array.isArray(quests) ? quests : [];
+      return response.data?.data?.quests || [];
     },
-    initialData: [],
   });
+
+  // 3. Fetch Quest History (Crucial for the calendar!)
+  const { data: historyData } = useQuery({
+    queryKey: ["calendar-quests-history"],
+    queryFn: async () => {
+      const response = await api.get("/quests/history?limit=100");
+      return response.data?.data?.quests || [];
+    },
+  });
+
+  // 4. Combine all quests into one searchable array
+  const allQuests = useMemo(() => {
+    const todayQ = Array.isArray(todaysQuests) ? todaysQuests : [];
+    const histQ = Array.isArray(historyData) ? historyData : [];
+    return [...todayQ, ...histQ];
+  }, [todaysQuests, historyData]);
 
   // 3. DEFENSIVE DATA MAPPING
   // This ensures that even if the API returns something weird, the app won't crash
@@ -66,10 +76,11 @@ export default function CalendarPage() {
   const isToday = (d) => same(d, today);
   const isPast = (d) => d < today && !same(d, today);
 
+  const questsForDay = (d) => 
+    allQuests.filter((q) => q.createdAt && same(new Date(q.createdAt), d));
+
   const raidsForDay = (d) =>
     safeRaids.filter((r) => r.dueAt && same(new Date(r.dueAt), d));
-
-  const questsForDay = (d) => (same(d, today) ? safeQuests : []);
 
   const weekRaids = safeRaids.filter((r) => {
     if (!r.dueAt) return false;
