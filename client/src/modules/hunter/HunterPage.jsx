@@ -39,10 +39,10 @@ const RANK_INSIGNIAS = {
     "https://res.cloudinary.com/di5reah7g/image/upload/v1784732149/F_Rank_gzgzmy.png",
   E: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/E_Rank_ljcatr.png",
   D: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/D_Rank_ofo1x0.png",
-  C: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/C_Rank_kqjvqj.png",
-  B: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/B_Rank_zkqjzk.png",
-  A: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/A_Rank_qjzqjz.png",
-  S: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/S_Rank_qjzqjz.png",
+  C: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/C_Rank_cjbn89.png",
+  B: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732086/B_Rank_yce5fe.png",
+  A: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732085/A_Rank_c0pwnx.png",
+  S: "https://res.cloudinary.com/di5reah7g/image/upload/v1784732085/S_Rank_ursozu.png",
   National:
     "https://res.cloudinary.com/di5reah7g/image/upload/v1784733748/National_Rank_btbfmm.png",
   Monarch:
@@ -72,9 +72,36 @@ export default function HunterPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [isUploading, setIsUploading] = useState(false);
 
+  const {
+    hunter: storeHunter,
+    stats: storeStats,
+    setHunter,
+    setStats,
+  } = useHunterStore();
+
   const [playClick] = useSound("/sounds/click.mp3", { volume: 0.1 });
 
   if (!hunter || !user) return null;
+
+  // Add a dedicated query that runs if the store is empty
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ["hunter-full-profile"],
+    queryFn: async () => {
+      const { data } = await api.get("/hunter/me");
+      // Sync with store if it's empty
+      if (!storeHunter) {
+        setHunter(data.data.hunter);
+        setStats(data.data.stats);
+      }
+      return data.data;
+    },
+    enabled: true,
+  });
+
+  const hunter = profile?.hunter || storeHunter;
+  const stats = profile?.stats || storeStats;
+
+  if (isLoading && !hunter) return <PageLoader />;
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files[0];
@@ -83,6 +110,15 @@ export default function HunterPage() {
     setIsUploading(true);
     const formData = new FormData();
     formData.append("avatar", file);
+
+    const { data: profileData, isLoading } = useQuery({
+      queryKey: ["hunter-profile"],
+      queryFn: async () => {
+        const { data } = await api.get("/hunter/me");
+        return data.data;
+      },
+      enabled: !hunter, // Only run if store is empty
+    });
 
     try {
       const { data } = await api.patch("/users/me/avatar", formData);
