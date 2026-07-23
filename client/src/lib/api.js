@@ -4,9 +4,8 @@ import { useHunterStore } from "../stores/hunterStore.js";
 console.log("VITE_API_URL:", import.meta.env.VITE_API_URL);
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1",
+  baseURL: "https://solo-leveling-system-backend-we1h.onrender.com/api/v1",
   withCredentials: true,
-  timeout: 15000,
 });
 
 console.log("Axios baseURL:", api.defaults.baseURL);
