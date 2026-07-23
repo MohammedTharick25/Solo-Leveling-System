@@ -10,8 +10,10 @@ import {
   Shield,
   Flame,
   Award,
+  Share2,
 } from "lucide-react";
-import {ActivityCalendar} from "react-activity-calendar";
+import { ActivityCalendar } from "react-activity-calendar";
+import { useQuery } from "@tanstack/react-query"; // Fixed: Ensure useQuery is imported
 
 // Stores & Logic
 import { useHunterStore } from "../../stores/hunterStore.js";
@@ -32,6 +34,7 @@ import {
   SectionHeader,
   Card,
   XPBar,
+  PageLoader,
 } from "../../components/ui/PageLoader.jsx";
 
 const RANK_INSIGNIAS = {
@@ -68,27 +71,26 @@ const ALL_STATS = [
 ];
 
 export default function HunterPage() {
-  const { hunter, stats, user, setHunter, setUser } = useHunterStore();
-  const [activeTab, setActiveTab] = useState("overview");
-  const [isUploading, setIsUploading] = useState(false);
-
+  // 1. Destructure everything from store ONCE
   const {
     hunter: storeHunter,
     stats: storeStats,
+    user,
     setHunter,
     setStats,
+    setUser,
   } = useHunterStore();
 
+  const [activeTab, setActiveTab] = useState("overview");
+  const [isUploading, setIsUploading] = useState(false);
   const [playClick] = useSound("/sounds/click.mp3", { volume: 0.1 });
 
-  if (!hunter || !user) return null;
-
-  // Add a dedicated query that runs if the store is empty
-  const { data: profile, isLoading } = useQuery({
+  // 2. Data Fetching (Called at top level)
+  const { data: profileData, isLoading } = useQuery({
     queryKey: ["hunter-full-profile"],
     queryFn: async () => {
       const { data } = await api.get("/hunter/me");
-      // Sync with store if it's empty
+      // Sync store if local data is missing
       if (!storeHunter) {
         setHunter(data.data.hunter);
         setStats(data.data.stats);
@@ -98,11 +100,33 @@ export default function HunterPage() {
     enabled: true,
   });
 
-  const hunter = profile?.hunter || storeHunter;
-  const stats = profile?.stats || storeStats;
+  // 2. Add the Share Function logic
+  const handleShareProfile = () => {
+    // This creates the URL for the PublicHunterProfile route defined in your AppRouter
+    const publicLink = `${window.location.origin}/h/${hunter.userId}`;
 
+    if (navigator.share) {
+      navigator.share({
+        title: `Hunter ${hunter.hunterName} - Solo Leveling`,
+        text: `Check out my Hunter Rank and Stats on The System!`,
+        url: publicLink,
+      });
+    } else {
+      // Fallback: Copy to clipboard
+      navigator.clipboard.writeText(publicLink);
+      alert("Public Link Copied to Clipboard!");
+    }
+  };
+
+  // 3. Derived State (Avoids variable re-declaration errors)
+  const hunter = profileData?.hunter || storeHunter;
+  const stats = profileData?.stats || storeStats;
+
+  // Early return for loading or missing access
   if (isLoading && !hunter) return <PageLoader />;
+  if (!hunter || !user) return null;
 
+  // 4. Logic Handlers
   const handleAvatarUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -111,24 +135,11 @@ export default function HunterPage() {
     const formData = new FormData();
     formData.append("avatar", file);
 
-    const { data: profileData, isLoading } = useQuery({
-      queryKey: ["hunter-profile"],
-      queryFn: async () => {
-        const { data } = await api.get("/hunter/me");
-        return data.data;
-      },
-      enabled: !hunter, // Only run if store is empty
-    });
-
     try {
       const { data } = await api.patch("/users/me/avatar", formData);
-
-      // Update store safely
       if (user) {
         setUser({ ...user, avatar: data.data.avatar });
       }
-
-      // Optional: Force a small delay to let Cloudinary propagate
       setTimeout(() => setIsUploading(false), 1000);
     } catch (err) {
       setIsUploading(false);
@@ -176,6 +187,14 @@ export default function HunterPage() {
             </div>
           </div>
 
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={handleShareProfile}
+              className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400 font-display text-[10px] tracking-widest hover:bg-cyan-500/20 transition-all shadow-glow-cyan-sm"
+            >
+              <Share2 size={14} />
+              SHARE ID
+            </button>
           <div className="flex bg-black/40 p-1 rounded-xl border border-slate-800">
             {["overview", "stats", "records"].map((tab) => (
               <button
@@ -195,6 +214,7 @@ export default function HunterPage() {
             ))}
           </div>
         </div>
+        </div>
 
         <AnimatePresence mode="wait">
           <motion.div
@@ -211,7 +231,6 @@ export default function HunterPage() {
                 <div className="lg:col-span-4 space-y-6">
                   <TiltCard>
                     <div className="glass-cyan p-0 rounded-3xl border border-white/10 overflow-hidden bg-slate-950 shadow-2xl">
-                      {/* Interactive Avatar Area */}
                       <div className="relative h-60 bg-gradient-to-t from-slate-950 to-cyan-900/40">
                         <img
                           src={
@@ -225,7 +244,6 @@ export default function HunterPage() {
                               "https://res.cloudinary.com/demo/image/upload/v1631711732/avatar-placeholder.png";
                           }}
                         />
-
                         <label className="absolute bottom-4 right-4 p-3 bg-black/70 rounded-full cursor-pointer hover:bg-cyan-600 transition-all border border-white/20 group">
                           {isUploading ? (
                             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -243,14 +261,12 @@ export default function HunterPage() {
                             accept="image/*"
                           />
                         </label>
-
-                        {/* Rank Badge Placement */}
                         <div className="absolute -bottom-10 left-8">
                           <div className="w-24 h-24 rounded-2xl bg-slate-900 border-4 border-slate-950 shadow-glow-cyan flex items-center justify-center overflow-hidden p-2">
                             <img
                               src={
                                 RANK_INSIGNIAS[hunter.rank] ||
-                                "https://res.cloudinary.com/di5reah7g/image/upload/v1784732149/F_Rank_gzgzmy.png"
+                                RANK_INSIGNIAS.Unawakened
                               }
                               alt="Rank"
                               className="w-full h-full object-contain"
@@ -258,7 +274,6 @@ export default function HunterPage() {
                           </div>
                         </div>
                       </div>
-
                       <div className="pt-14 pb-8 px-8">
                         <h2 className="text-2xl font-black text-white flex items-center gap-2 uppercase tracking-tighter">
                           {hunter.hunterName}{" "}
@@ -268,7 +283,7 @@ export default function HunterPage() {
                           />
                         </h2>
                         <p className="text-[10px] text-slate-500 font-mono mb-6 uppercase tracking-widest">
-                          System_ID: {hunter._id.slice(-10)}
+                          System_ID: {hunter._id?.slice(-10)}
                         </p>
                         <XPBar hunter={hunter} />
                       </div>
@@ -292,7 +307,6 @@ export default function HunterPage() {
                       color="text-yellow-400"
                     />
                   </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="bg-slate-900/60 p-6 rounded-2xl border border-white/5 backdrop-blur-md">
                       <div className="flex items-center gap-3 mb-6">
@@ -323,7 +337,6 @@ export default function HunterPage() {
                         </div>
                       </div>
                     </div>
-
                     <div className="bg-gradient-to-br from-slate-900 to-cyan-950/30 p-6 rounded-2xl border border-cyan-500/20">
                       <div className="flex items-center gap-3 mb-4 text-cyan-400">
                         <Flame size={20} />
@@ -351,7 +364,13 @@ export default function HunterPage() {
                   />
                   <div className="flex justify-center py-6 overflow-x-auto">
                     <ActivityCalendar
-                      data={[{ date: "2024-01-01", count: 1, level: 1 }]}
+                      data={[
+                        {
+                          date: new Date().toISOString().split("T")[0],
+                          count: 1,
+                          level: 1,
+                        },
+                      ]}
                       theme={{
                         dark: [
                           "#1e293b",
