@@ -2,8 +2,10 @@ import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import { useHunterStore } from "../stores/hunterStore.js";
 import { queryClient } from "../lib/queryClient.js";
+import { useQueryClient } from '@tanstack/react-query';
 
 export const useSocket = () => {
+  const queryClient = useQueryClient();
   const socketRef = useRef(null);
   const { token, pushToast, triggerLevelUp, triggerRankUp } = useHunterStore();
 
@@ -62,14 +64,6 @@ export const useSocket = () => {
       queryClient.invalidateQueries({ queryKey: ["quests"] });
     });
 
-    socket.on("system:daily-quests-complete", ({ total }) => {
-      pushToast(
-        "questCompleted",
-        "🎉 ALL DAILY QUESTS COMPLETE",
-        `All ${total} quests completed. Streak maintained!`,
-      );
-      queryClient.invalidateQueries({ queryKey: ["hunter"] });
-    });
 
     socket.on("system:streak-broken", ({ lostStreak, xpPenalty }) => {
       pushToast(
@@ -138,6 +132,27 @@ export const useSocket = () => {
       );
       queryClient.invalidateQueries({ queryKey: ["dungeons"] });
     });
+
+    socket.on("system:daily-quests-complete", ({ total }) => {
+      pushToast(
+        "questCompleted",
+        "🎉 ALL DAILY QUESTS COMPLETE",
+        `All ${total} quests completed. Streak maintained!`,
+      );
+      queryClient.invalidateQueries({ queryKey: ["hunter"] });
+    });
+
+    socket.on("system:daily-quests-complete", (data) => {
+      pushToast(
+        "questCompleted",
+        "🎉 ALL DAILY QUESTS COMPLETE",
+        `All quests completed. Streak maintained!`,
+      );
+  // Refresh hunter data (streak, total completions)
+  queryClient.invalidateQueries({ queryKey: ['hunter'] });
+  // Refresh quest list
+  queryClient.invalidateQueries({ queryKey: ['calendar-quests-today'] });
+});
 
     socket.on("disconnect", () => {
       console.log("[SOCKET] Disconnected from The System");
