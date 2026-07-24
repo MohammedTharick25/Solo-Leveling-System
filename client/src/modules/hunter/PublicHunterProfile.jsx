@@ -129,7 +129,7 @@ export default function PublicHunterProfile() {
                       className={`w-40 h-40 rounded-3xl border-2 p-1 overflow-hidden ${rankGlow}`}
                     >
                       <div className="w-full h-full rounded-[1.3rem] bg-slate-800 flex items-center justify-center overflow-hidden">
-                        {/* Use hunter.avatar?.url now that the backend is sending it */}
+                        {/* This will now find hunter.avatar.url because of the backend change above */}
                         {hunter.avatar?.url ? (
                           <img
                             src={hunter.avatar.url}
