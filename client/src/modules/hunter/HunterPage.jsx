@@ -102,17 +102,22 @@ export default function HunterPage() {
 
   // 2. Add the Share Function logic
   const handleShareProfile = () => {
-    // This creates the URL for the PublicHunterProfile route defined in your AppRouter
-    const publicLink = `${window.location.origin}/h/${hunter.userId}`;
+    // Ensure hunter exists before trying to access properties
+    if (!hunter) return;
+
+    // Use userId or _id depending on your backend response
+    const id = hunter.userId || hunter._id;
+    const publicLink = `${window.location.origin}/h/${id}`;
 
     if (navigator.share) {
-      navigator.share({
-        title: `Hunter ${hunter.hunterName} - Solo Leveling`,
-        text: `Check out my Hunter Rank and Stats on The System!`,
-        url: publicLink,
-      });
+      navigator
+        .share({
+          title: `Hunter ${hunter.hunterName} - Solo Leveling`,
+          text: `Check out my Hunter Rank and Stats on The System!`,
+          url: publicLink,
+        })
+        .catch(() => {});
     } else {
-      // Fallback: Copy to clipboard
       navigator.clipboard.writeText(publicLink);
       alert("Public Link Copied to Clipboard!");
     }

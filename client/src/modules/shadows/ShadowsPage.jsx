@@ -7,6 +7,7 @@ import {
   staggerContainer,
   staggerItem,
 } from "../../lib/animations.js";
+
 import {
   SectionHeader,
   EmptyState,
@@ -103,6 +104,7 @@ export default function ShadowsPage() {
     },
   });
 
+  const [infoModal, setInfoModal] = useState(false);
   const shadows = data?.shadows || [];
   const unlockedTypes = new Set(shadows.map((s) => s.type));
 
