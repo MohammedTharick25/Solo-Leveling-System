@@ -61,7 +61,7 @@ export default function PublicHunterProfile() {
 
   const hunter = data?.hunter || {};
   const stats = data?.stats || {};
-  
+
   const rankColor = RANK_COLORS[hunter.rank] || "text-slate-400";
   const rankGlow = RANK_GLOW[hunter.rank] || "";
 
@@ -129,9 +129,17 @@ export default function PublicHunterProfile() {
                       className={`w-40 h-40 rounded-3xl border-2 p-1 overflow-hidden ${rankGlow}`}
                     >
                       <div className="w-full h-full rounded-[1.3rem] bg-slate-800 flex items-center justify-center overflow-hidden">
-                        <span className="font-display text-6xl text-slate-100">
-                          {hunter.hunterName?.[0]?.toUpperCase()}
-                        </span>
+                        {hunter.avatar?.url ? (
+                          <img
+                            src={hunter.avatar.url}
+                            alt={hunter.hunterName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="font-display text-6xl text-slate-100">
+                            {hunter.hunterName?.[0]?.toUpperCase()}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="absolute -bottom-4 -right-4">

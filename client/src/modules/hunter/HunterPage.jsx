@@ -171,7 +171,7 @@ export default function HunterPage() {
 
       <div className="relative z-10 max-w-7xl mx-auto p-4 lg:p-8">
         {/* HUD TOP HEADER */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-8 bg-slate-900/80 p-4 rounded-2xl border border-white/5 backdrop-blur-xl">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 bg-slate-900/80 p-4 rounded-2xl border border-white/5 backdrop-blur-xl">
           <div className="flex items-center gap-6">
             <div className="flex flex-col">
               <span className="text-[10px] text-cyan-500 font-black tracking-[0.2em] uppercase">
@@ -193,32 +193,32 @@ export default function HunterPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={handleShareProfile}
               className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400 font-display text-[10px] tracking-widest hover:bg-cyan-500/20 transition-all shadow-glow-cyan-sm"
             >
               <Share2 size={14} />
               SHARE ID
             </button>
-          <div className="flex bg-black/40 p-1 rounded-xl border border-slate-800">
-            {["overview", "stats", "records"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => {
-                  playClick();
-                  setActiveTab(tab);
-                }}
-                className={`px-4 lg:px-8 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                  activeTab === tab
-                    ? "bg-cyan-600 text-white shadow-glow-cyan-sm"
-                    : "text-slate-500 hover:text-slate-300"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+            <div className="flex bg-black/40 p-1 rounded-xl border border-slate-800">
+              {["overview", "stats", "records"].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => {
+                    playClick();
+                    setActiveTab(tab);
+                  }}
+                  className={`px-4 lg:px-8 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                    activeTab === tab
+                      ? "bg-cyan-600 text-white shadow-glow-cyan-sm"
+                      : "text-slate-500 hover:text-slate-300"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
         </div>
 
         <AnimatePresence mode="wait">
@@ -459,7 +459,7 @@ function SummaryCard({ label, value, icon, color }) {
       <h4 className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-4">
         {label}
       </h4>
-      <p className={`text-5xl font-display font-bold ${color}`}>
+      <p className={`text-3xl md:text-5xl font-display font-bold ${color}`}>
         {typeof value === "number" ? <CountUp end={value} /> : value}
       </p>
     </div>
