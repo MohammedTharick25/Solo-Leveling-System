@@ -1,5 +1,12 @@
 import { motion, useMotionValue, useTransform } from "framer-motion";
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, RadarChart as ReRadar } from 'recharts';
+import {
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ResponsiveContainer,
+} from "recharts";
 import CountUp from 'react-countup';
 
 // 1. 3D Tilt Effect Wrapper
@@ -29,10 +36,11 @@ export const TiltCard = ({ children }) => {
 export const PowerRadar = ({ stats }) => {
   const s = stats || {};
 
-  // Helper to extract value whether it's {value: 10} or just 10
+  // Helper to extract value whether it's a nested object {value: 10} or a flat number
   const getVal = (stat) => {
     if (typeof stat === "number") return stat;
-    return stat?.value || 0;
+    if (stat && typeof stat.value === "number") return stat.value;
+    return 0;
   };
 
   const data = [
@@ -47,20 +55,25 @@ export const PowerRadar = ({ stats }) => {
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        {/* Added domain [0, 100] to ensure the shape fills correctly */}
         <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
           <PolarGrid stroke="#1e293b" />
           <PolarAngleAxis
             dataKey="name"
-            tick={{ fill: "#94a3b8", fontSize: 10 }}
+            tick={{ fill: "#94a3b8", fontSize: 10, fontFamily: "Rajdhani" }}
           />
-          {/* Ensure the Radar has a fill and a stroke */}
+          {/* CRITICAL: PolarRadiusAxis defines the 0-100 scale so it's not a dot */}
+          <PolarRadiusAxis
+            angle={30}
+            domain={[0, 100]}
+            tick={false}
+            axisLine={false}
+          />
           <Radar
-            name="Stats"
+            name="Hunter"
             dataKey="val"
             stroke="#06b6d4"
             fill="#06b6d4"
-            fillOpacity={0.6}
+            fillOpacity={0.5}
           />
         </RadarChart>
       </ResponsiveContainer>

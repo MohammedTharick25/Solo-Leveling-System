@@ -129,6 +129,7 @@ export default function PublicHunterProfile() {
                       className={`w-40 h-40 rounded-3xl border-2 p-1 overflow-hidden ${rankGlow}`}
                     >
                       <div className="w-full h-full rounded-[1.3rem] bg-slate-800 flex items-center justify-center overflow-hidden">
+                        {/* CHECK FOR AVATAR URL HERE */}
                         {hunter.avatar?.url ? (
                           <img
                             src={hunter.avatar.url}
@@ -155,18 +156,29 @@ export default function PublicHunterProfile() {
                   >
                     {hunter.hunterName}
                   </h1>
-                  <div className="flex flex-wrap gap-2 mb-6 justify-center lg:justify-start">
+                  <div className="flex flex-wrap gap-2 mb-6 justify-center lg:justify-start items-center">
+                    {/* Official System Rank */}
+                    <Badge
+                      color="cyan"
+                      className="py-1 px-3 uppercase font-bold tracking-widest border border-cyan-500/30"
+                    >
+                      {hunter.rank} RANK
+                    </Badge>
+
+                    {/* Current Level */}
+                    <Badge color="slate" className="py-1 px-3 bg-slate-800/50">
+                      LV. {hunter.level}
+                    </Badge>
+
+                    {/* Display the Equipped Title with a different color (Purple) */}
                     {hunter.title && (
                       <Badge
                         color="purple"
-                        className="py-1 px-3 uppercase tracking-widest"
+                        className="py-1 px-3 uppercase text-[10px] tracking-widest italic opacity-80"
                       >
-                        {hunter.title}
+                        T: {hunter.title}
                       </Badge>
                     )}
-                    <Badge color="cyan" className="py-1 px-3">
-                      LV. {hunter.level}
-                    </Badge>
                   </div>
 
                   <div className="w-full space-y-4">
