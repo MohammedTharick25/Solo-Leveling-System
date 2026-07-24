@@ -55,10 +55,22 @@ export const awardXP = async (userId, baseXP, io = null) => {
   }
 
   if (newRank !== previousRank) {
-    if (!hunter.titles.includes(`${newRank} Rank Hunter`))
-      hunter.titles.push(`${newRank} Rank Hunter`);
+    const newRankTitle = `${newRank} Rank Hunter`;
+
+    // 1. Add to unlocked titles if not already there
+    if (!hunter.titles.includes(newRankTitle)) {
+      hunter.titles.push(newRankTitle);
+    }
+
+    // 2. AUTO-EQUIP the new rank title if the current title is an old rank title
+    // This prevents "C Rank" hunters from showing "D Rank Hunter"
+    if (!hunter.title || hunter.title.toLowerCase().includes("rank hunter")) {
+      hunter.title = newRankTitle;
+    }
+
     if (io)
       io.to(`user:${userId}`).emit("system:rank-up", { newRank, previousRank });
+
     await createNotification(
       userId,
       "rankUp",
