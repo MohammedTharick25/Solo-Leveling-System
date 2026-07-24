@@ -36,11 +36,9 @@ export const TiltCard = ({ children }) => {
 export const PowerRadar = ({ stats }) => {
   const s = stats || {};
 
-  // Helper to extract value whether it's a nested object {value: 10} or a flat number
   const getVal = (stat) => {
     if (typeof stat === "number") return stat;
-    if (stat && typeof stat.value === "number") return stat.value;
-    return 0;
+    return stat?.value || 0;
   };
 
   const data = [
@@ -59,17 +57,11 @@ export const PowerRadar = ({ stats }) => {
           <PolarGrid stroke="#1e293b" />
           <PolarAngleAxis
             dataKey="name"
-            tick={{ fill: "#94a3b8", fontSize: 10, fontFamily: "Rajdhani" }}
+            tick={{ fill: "#94a3b8", fontSize: 10 }}
           />
-          {/* CRITICAL: PolarRadiusAxis defines the 0-100 scale so it's not a dot */}
-          <PolarRadiusAxis
-            angle={30}
-            domain={[0, 100]}
-            tick={false}
-            axisLine={false}
-          />
+          {/* This Axis ensures the chart isn't just a tiny dot */}
+          <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
           <Radar
-            name="Hunter"
             dataKey="val"
             stroke="#06b6d4"
             fill="#06b6d4"
