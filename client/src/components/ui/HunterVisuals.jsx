@@ -27,13 +27,16 @@ export const TiltCard = ({ children }) => {
 
 // 2. Power Radar Chart
 export const PowerRadar = ({ stats }) => {
+  // Defensive check: if stats is missing, use an empty object
+  const s = stats || {};
+
   const data = [
-    { name: 'STR', val: stats.strength?.value || 0 },
-    { name: 'AGI', val: stats.agility?.value || 0 },
-    { name: 'INT', val: stats.intelligence?.value || 0 },
-    { name: 'VIT', val: stats.vitality?.value || 0 },
-    { name: 'SEN', val: stats.sense?.value || 0 },
-    { name: 'DIS', val: stats.discipline?.value || 0 },
+    { name: "STR", val: s.strength?.value || 0 },
+    { name: "AGI", val: s.agility?.value || 0 },
+    { name: "INT", val: s.intelligence?.value || 0 },
+    { name: "VIT", val: s.vitality?.value || 0 },
+    { name: "SEN", val: s.sense?.value || 0 },
+    { name: "DIS", val: s.discipline?.value || 0 },
   ];
 
   return (
@@ -41,7 +44,10 @@ export const PowerRadar = ({ stats }) => {
       <ResponsiveContainer width="100%" height="100%">
         <RadarChart data={data}>
           <PolarGrid stroke="#1e293b" />
-          <PolarAngleAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+          <PolarAngleAxis
+            dataKey="name"
+            tick={{ fill: "#94a3b8", fontSize: 10 }}
+          />
           <Radar
             dataKey="val"
             stroke="#06b6d4"

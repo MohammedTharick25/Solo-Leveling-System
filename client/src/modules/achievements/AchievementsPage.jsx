@@ -7,7 +7,7 @@ import {
   staggerContainer,
   staggerItem,
 } from "../../lib/animations.js";
-import { SectionHeader, Button } from "../../components/ui/PageLoader.jsx";
+import { SectionHeader, Button, PageLoader } from "../../components/ui/PageLoader.jsx";
 
 const RARITY_STYLES = {
   common: {

@@ -59,7 +59,9 @@ export default function PublicHunterProfile() {
   if (isLoading) return <LoadingScreen />;
   if (isError || !data) return <NotFoundScreen />;
 
-  const { hunter, stats } = data;
+  const hunter = data?.hunter || {};
+  const stats = data?.stats || {};
+  
   const rankColor = RANK_COLORS[hunter.rank] || "text-slate-400";
   const rankGlow = RANK_GLOW[hunter.rank] || "";
 
