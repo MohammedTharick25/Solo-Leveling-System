@@ -27,32 +27,40 @@ export const TiltCard = ({ children }) => {
 
 // 2. Power Radar Chart
 export const PowerRadar = ({ stats }) => {
-  // Defensive check: if stats is missing, use an empty object
   const s = stats || {};
 
+  // Helper to extract value whether it's {value: 10} or just 10
+  const getVal = (stat) => {
+    if (typeof stat === "number") return stat;
+    return stat?.value || 0;
+  };
+
   const data = [
-    { name: "STR", val: s.strength?.value || 0 },
-    { name: "AGI", val: s.agility?.value || 0 },
-    { name: "INT", val: s.intelligence?.value || 0 },
-    { name: "VIT", val: s.vitality?.value || 0 },
-    { name: "SEN", val: s.sense?.value || 0 },
-    { name: "DIS", val: s.discipline?.value || 0 },
+    { name: "STR", val: getVal(s.strength) },
+    { name: "AGI", val: getVal(s.agility) },
+    { name: "INT", val: getVal(s.intelligence) },
+    { name: "VIT", val: getVal(s.vitality) },
+    { name: "SEN", val: getVal(s.sense) },
+    { name: "DIS", val: getVal(s.discipline) },
   ];
 
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <RadarChart data={data}>
+        {/* Added domain [0, 100] to ensure the shape fills correctly */}
+        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
           <PolarGrid stroke="#1e293b" />
           <PolarAngleAxis
             dataKey="name"
             tick={{ fill: "#94a3b8", fontSize: 10 }}
           />
+          {/* Ensure the Radar has a fill and a stroke */}
           <Radar
+            name="Stats"
             dataKey="val"
             stroke="#06b6d4"
             fill="#06b6d4"
-            fillOpacity={0.5}
+            fillOpacity={0.6}
           />
         </RadarChart>
       </ResponsiveContainer>
