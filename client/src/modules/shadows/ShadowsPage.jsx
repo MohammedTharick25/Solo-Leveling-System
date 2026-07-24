@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Ghost, Lock, Info, HelpCircle } from "lucide-react";
+import { useState } from "react";
 import api from "../../lib/api.js";
 import {
   pageVariants,
