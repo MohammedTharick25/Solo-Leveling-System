@@ -41,7 +41,7 @@ const RARITY_ORDER = { legendary: 0, epic: 1, rare: 2, common: 3 };
 export default function AchievementsPage() {
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["achievements"],
     queryFn: async () => {
       const response = await api.get("/achievements");
