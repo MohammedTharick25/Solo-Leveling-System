@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { useState } from "react";
 import {
   Flame,
   Sword,
@@ -60,6 +61,7 @@ const RANK_INSIGNIAS = {
 
 export default function DashboardPage() {
   const { hunter, stats, user } = useHunterStore();
+  const [isUploading, setIsUploading] = useState(false);
 
   // Queries
   const { data: questData } = useQuery({
