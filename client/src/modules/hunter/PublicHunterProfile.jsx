@@ -129,7 +129,6 @@ export default function PublicHunterProfile() {
                       className={`w-40 h-40 rounded-3xl border-2 p-1 overflow-hidden ${rankGlow}`}
                     >
                       <div className="w-full h-full rounded-[1.3rem] bg-slate-800 flex items-center justify-center overflow-hidden">
-                        {/* This will now find hunter.avatar.url because of the backend change above */}
                         {hunter.avatar?.url ? (
                           <img
                             src={hunter.avatar.url}
@@ -137,7 +136,7 @@ export default function PublicHunterProfile() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <span className="font-display text-6xl text-slate-100">
+                          <span className="font-display text-7xl font-black text-slate-700">
                             {hunter.hunterName?.[0]?.toUpperCase()}
                           </span>
                         )}

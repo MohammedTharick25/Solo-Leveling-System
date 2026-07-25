@@ -10,26 +10,23 @@ export const getMyProfile = asyncHandler(async (req, res) => {
 });
 
 export const getPublicCard = asyncHandler(async (req, res) => {
-  // We find the hunter, but we also "populate" the avatar from the User model
   const hunter = await Hunter.findOne({ userId: req.params.id })
     .select(
       "hunterName level rank title powerScore currentStreak totalQuestCompletions totalXP achievements userId",
     )
     .populate({
       path: "userId",
-      select: "avatar", // Only get the avatar field from the User
+      select: "avatar",
     });
 
   if (!hunter) {
-    return res
-      .status(404)
-      .json({ status: "error", message: "Hunter not found." });
+    throw new AppError("Hunter not found.", 404);
   }
 
   const stats = await Stats.findOne({ userId: req.params.id });
-
-  // Convert to object so we can move the avatar field for the frontend to find it easily
   const hunterObj = hunter.toObject();
+
+  // Map the avatar from the populated userId object to the hunter object
   if (hunter.userId && hunter.userId.avatar) {
     hunterObj.avatar = hunter.userId.avatar;
   }
