@@ -49,6 +49,7 @@ app.use(
         connectSrc: [
           "'self'",
           "http://localhost:5000",
+          "http://localhost:5173",
           "https://solo-leveling-system-frontend.onrender.com",
           "https://solo-leveling-system-backend-we1h.onrender.com",
           "ws://localhost:5000",
@@ -58,9 +59,31 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" }, // Allows images to be shared across ports
   }),
 );
+// app.use(
+//   cors({
+//     origin: config.CLIENT_URL,
+//     credentials: true,
+//     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+//   }),
+// );
+
+const allowedOrigins = [
+  config.CLIENT_URL,
+  config.PRODUCTION_URL,
+];
+
 app.use(
   cors({
-    origin: config.CLIENT_URL,
+    origin(origin, callback) {
+      // Allow Postman/server-to-server requests
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   }),

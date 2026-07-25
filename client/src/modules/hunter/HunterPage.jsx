@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import useSound from "use-sound";
 import CountUp from "react-countup";
@@ -99,6 +99,42 @@ export default function HunterPage() {
     },
     enabled: true,
   });
+
+  // 1. Add this query alongside your profileData query in HunterPage.jsx
+  const currentYear = new Date().getFullYear();
+  const { data: heatmapData } = useQuery({
+    queryKey: ["hunter-heatmap", currentYear],
+    queryFn: async () => {
+      const { data } = await api.get(`/analytics/heatmap?year=${currentYear}`);
+      return data.data;
+    },
+  });
+
+  // 2. Add this helper function to format the data correctly
+  const calendarData = useMemo(() => {
+    const rawData = heatmapData?.heatmap || [];
+
+    // Create a mapping of dates to scores
+    const dataMap = Object.fromEntries(rawData.map((d) => [d.date, d.score]));
+
+    const yearData = [];
+    const start = new Date(`${currentYear}-01-01`);
+    const end = new Date(`${currentYear}-12-31`);
+
+    // Loop through every day of the year to ensure boxes are rendered
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split("T")[0];
+      const score = dataMap[dateStr] || 0;
+
+      yearData.push({
+        date: dateStr,
+        count: score,
+        // react-activity-calendar levels are 0-4
+        level: score === 0 ? 0 : Math.max(1, Math.ceil(score / 25)),
+      });
+    }
+    return yearData;
+  }, [heatmapData, currentYear]);
 
   // 2. Add the Share Function logic
   const handleShareProfile = () => {
@@ -369,20 +405,18 @@ export default function HunterPage() {
                   />
                   <div className="flex justify-center py-6 overflow-x-auto">
                     <ActivityCalendar
-                      data={[
-                        {
-                          date: new Date().toISOString().split("T")[0],
-                          count: 1,
-                          level: 1,
-                        },
-                      ]}
+                      data={calendarData} // Use the processed data here
+                      showWeekdayLabels
+                      labels={{
+                        totalCount: "{{count}} activities in " + currentYear,
+                      }}
                       theme={{
                         dark: [
-                          "#1e293b",
-                          "#0e7490",
-                          "#0891b2",
-                          "#06b6d4",
-                          "#22d3ee",
+                          "#1e293b", // Level 0 (Empty box)
+                          "#0e7490", // Level 1
+                          "#0891b2", // Level 2
+                          "#06b6d4", // Level 3
+                          "#22d3ee", // Level 4
                         ],
                       }}
                     />

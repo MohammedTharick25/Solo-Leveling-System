@@ -1,7 +1,19 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Clock, Target, Scroll } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Target,
+  Scroll,
+  Calendar as CalendarIcon,
+  Sword,
+  CheckCircle2,
+  AlertCircle,
+  // Badge,
+} from "lucide-react";
+import { Badge } from "../../components/ui/PageLoader.jsx";
 import api from "../../lib/api.js";
 import {
   pageVariants,
@@ -51,7 +63,7 @@ export default function CalendarPage() {
     },
   });
 
-  // 3. Fetch Quest History (Crucial for the calendar!)
+  // 3. Fetch Quest History
   const { data: historyData } = useQuery({
     queryKey: ["calendar-quests-history"],
     queryFn: async () => {
@@ -60,15 +72,13 @@ export default function CalendarPage() {
     },
   });
 
-  // 4. Combine all quests into one searchable array
+  // 4. Combine all quests
   const allQuests = useMemo(() => {
     const todayQ = Array.isArray(todaysQuests) ? todaysQuests : [];
     const histQ = Array.isArray(historyData) ? historyData : [];
     return [...todayQ, ...histQ];
   }, [todaysQuests, historyData]);
 
-  // 3. DEFENSIVE DATA MAPPING
-  // This ensures that even if the API returns something weird, the app won't crash
   const safeRaids = Array.isArray(raidsData) ? raidsData : [];
   const safeQuests = Array.isArray(todaysQuests) ? todaysQuests : [];
 
@@ -76,7 +86,7 @@ export default function CalendarPage() {
   const isToday = (d) => same(d, today);
   const isPast = (d) => d < today && !same(d, today);
 
-  const questsForDay = (d) => 
+  const questsForDay = (d) =>
     allQuests.filter((q) => q.createdAt && same(new Date(q.createdAt), d));
 
   const raidsForDay = (d) =>
@@ -90,10 +100,7 @@ export default function CalendarPage() {
 
   const fmt = () => {
     const o = { month: "short", day: "numeric" };
-    return `${wkStart.toLocaleDateString("en", o)} – ${wkEnd.toLocaleDateString(
-      "en",
-      o,
-    )}, ${wkEnd.getFullYear()}`;
+    return `${wkStart.toLocaleDateString("en", o)} – ${wkEnd.toLocaleDateString("en", o)}, ${wkEnd.getFullYear()}`;
   };
 
   return (
@@ -102,145 +109,204 @@ export default function CalendarPage() {
       initial="initial"
       animate="animate"
       exit="exit"
+      className="pb-10"
     >
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+      {/* Immersive Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
         <div>
-          <p className="text-system mb-1">Time Architecture</p>
-          <h1 className="font-heading font-bold text-2xl text-slate-100">
-            Weekly Calendar
+          <div className="flex items-center gap-2 text-cyan-500 mb-1">
+            <CalendarIcon size={14} className="animate-pulse" />
+            <p className="text-system uppercase tracking-[0.2em] text-[10px] font-bold">
+              Chronos synchronization
+            </p>
+          </div>
+          <h1 className="font-heading font-black text-4xl text-white italic tracking-tighter uppercase">
+            Time Architecture
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center bg-black/40 p-1.5 rounded-2xl border border-white/5 backdrop-blur-xl">
           <button
             onClick={() => setWkStart(sow(new Date()))}
-            className="btn-ghost text-sm py-1.5 px-3 border border-slate-700"
+            className="btn-ghost text-[10px] font-black uppercase px-4 py-2 hover:bg-white/5 rounded-xl transition-all"
           >
             Today
           </button>
-          <button
-            onClick={() => setWkStart(addD(wkStart, -7))}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <span className="font-heading text-sm text-slate-300 min-w-[180px] text-center">
-            {fmt()}
-          </span>
-          <button
-            onClick={() => setWkStart(addD(wkStart, 7))}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all"
-          >
-            <ChevronRight size={18} />
-          </button>
+          <div className="h-4 w-px bg-slate-800 mx-1" />
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setWkStart(addD(wkStart, -7))}
+              className="p-2 text-slate-500 hover:text-white transition-colors"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <span className="font-heading text-xs font-bold text-slate-200 min-w-[140px] text-center tracking-widest uppercase">
+              {fmt()}
+            </span>
+            <button
+              onClick={() => setWkStart(addD(wkStart, 7))}
+              className="p-2 text-slate-500 hover:text-white transition-colors"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="glass rounded-2xl overflow-hidden border border-slate-700/50">
-        <div className="grid grid-cols-7 border-b border-slate-800/60">
+      {/* Main Calendar Grid */}
+      <div className="glass-dark rounded-[2rem] border border-white/5 overflow-hidden shadow-2xl">
+        {/* Day Headers (Hidden on tiny screens, visible on Tablet+) */}
+        <div className="hidden md:grid grid-cols-7 border-b border-white/5 bg-white/[0.02]">
           {wkDays.map((d, i) => (
             <div
               key={i}
-              className={`p-3 text-center border-r border-slate-800/40 last:border-r-0 ${
-                isToday(d)
-                  ? "bg-cyan-500/10"
-                  : isPast(d)
-                    ? "bg-slate-900/30"
-                    : ""
-              }`}
+              className={`p-4 text-center border-r border-white/5 last:border-r-0 ${isToday(d) ? "bg-cyan-500/5" : ""}`}
             >
-              <p className="font-heading text-[10px] text-slate-500 uppercase tracking-widest mb-1">
+              <p
+                className={`font-display text-[10px] tracking-[0.2em] uppercase mb-2 ${isToday(d) ? "text-cyan-400" : "text-slate-500"}`}
+              >
                 {DAYS[d.getDay()]}
               </p>
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center mx-auto font-display text-sm font-bold
-                ${
-                  isToday(d)
-                    ? "bg-cyan-500 text-slate-950 shadow-glow-cyan-sm"
-                    : isPast(d)
-                      ? "text-slate-600"
-                      : "text-slate-200"
-                }`}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto font-display text-lg font-black transition-all
+                ${isToday(d) ? "bg-cyan-500 text-slate-950 shadow-glow-cyan" : isPast(d) ? "text-slate-600" : "text-slate-200"}`}
               >
                 {d.getDate()}
               </div>
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 min-h-[400px]">
+
+        {/* Responsive Content Area */}
+        <div className="grid grid-cols-1 md:grid-cols-7 min-h-[500px]">
           {wkDays.map((d, i) => {
             const dR = raidsForDay(d),
               dQ = questsForDay(d);
             return (
               <div
                 key={i}
-                className={`border-r border-slate-800/40 last:border-r-0 p-2 space-y-1 ${
-                  isToday(d) ? "bg-cyan-500/5" : isPast(d) ? "opacity-50" : ""
-                }`}
+                className={`border-r border-white/5 last:border-r-0 p-3 space-y-3 transition-colors relative
+                ${isToday(d) ? "bg-cyan-500/[0.03]" : isPast(d) ? "bg-black/20" : ""}`}
               >
+                {/* Mobile-Only Date Header */}
+                <div className="md:hidden flex items-center justify-between mb-2 pb-2 border-b border-white/5">
+                  <span className="font-display text-xs font-black text-slate-500 tracking-widest uppercase">
+                    {DAYS[d.getDay()]} {d.getDate()}
+                  </span>
+                  {isToday(d) && <Badge color="cyan">Active Point</Badge>}
+                </div>
+
+                {/* Quests Section */}
                 {dQ.length > 0 && (
-                  <div className="mb-2">
-                    <p className="font-display text-[8px] text-cyan-500 tracking-widest uppercase mb-1">
-                      Quests
-                    </p>
-                    {dQ.slice(0, 4).map((q) => (
-                      <div
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <div className="w-1 h-3 bg-cyan-500 rounded-full" />
+                      <p className="font-display text-[9px] text-cyan-500 tracking-widest uppercase font-bold">
+                        Daily Quests
+                      </p>
+                    </div>
+                    {dQ.map((q) => (
+                      <motion.div
                         key={q._id}
-                        className={`px-1.5 py-1 rounded-md mb-0.5 border-l-2 ${
-                          q.status === "completed"
-                            ? "border-emerald-500 bg-emerald-500/10 opacity-60"
-                            : "border-cyan-500 bg-cyan-500/10"
-                        }`}
+                        initial={{ opacity: 0, x: -5 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className={`group p-2 rounded-xl border border-white/5 transition-all
+                          ${q.status === "completed" ? "bg-emerald-500/10 border-emerald-500/20" : "bg-cyan-500/5 border-cyan-500/10 hover:border-cyan-500/30"}`}
                       >
-                        <p
-                          className={`font-heading text-[9px] truncate ${
-                            q.status === "completed"
-                              ? "text-slate-500 line-through"
-                              : "text-cyan-300"
-                          }`}
-                        >
-                          {q.title}
-                        </p>
-                      </div>
+                        <div className="flex items-start gap-2">
+                          {q.status === "completed" ? (
+                            <CheckCircle2
+                              size={10}
+                              className="text-emerald-500 mt-0.5 shrink-0"
+                            />
+                          ) : (
+                            <Scroll
+                              size={10}
+                              className="text-cyan-500 mt-0.5 shrink-0"
+                            />
+                          )}
+                          <p
+                            className={`font-heading text-[10px] leading-tight font-bold transition-all
+                              ${q.status === "completed" ? "text-slate-500 line-through" : "text-slate-200 group-hover:text-cyan-300"}`}
+                          >
+                            {q.title}
+                          </p>
+                        </div>
+                      </motion.div>
                     ))}
                   </div>
                 )}
-                {dR.map((r) => {
-                  const ov =
-                    r.dueAt &&
-                    new Date(r.dueAt) < today &&
-                    r.status !== "completed";
-                  const dn = r.status === "completed";
-                  const PB = {
-                    critical: "border-red-500",
-                    high: "border-yellow-500",
-                    medium: "border-blue-500",
-                    low: "border-slate-600",
-                  };
-                  return (
-                    <div
-                      key={r._id}
-                      className={`px-1.5 py-1 rounded-md border-l-2 mb-0.5 ${
-                        dn
-                          ? "border-emerald-500 bg-emerald-500/10 opacity-50"
-                          : ov
-                            ? "border-red-500 bg-red-500/10"
-                            : `${PB[r.priority] || "border-slate-600"} bg-purple-500/10`
-                      }`}
-                    >
-                      <p
-                        className={`font-heading text-[9px] truncate ${
-                          dn
-                            ? "text-slate-500 line-through"
-                            : ov
-                              ? "text-red-300"
-                              : "text-purple-300"
-                        }`}
-                      >
-                        {r.title}
+
+                {/* Raids Section */}
+                {dR.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 mb-2 mt-4">
+                      <div className="w-1 h-3 bg-purple-500 rounded-full" />
+                      <p className="font-display text-[9px] text-purple-500 tracking-widest uppercase font-bold">
+                        Task Raids
                       </p>
                     </div>
-                  );
-                })}
+                    {dR.map((r) => {
+                      const ov =
+                        r.dueAt &&
+                        new Date(r.dueAt) < today &&
+                        r.status !== "completed";
+                      const dn = r.status === "completed";
+                      const PB = {
+                        critical: "border-red-500",
+                        high: "border-yellow-500",
+                        medium: "border-blue-500",
+                        low: "border-slate-600",
+                      };
+
+                      return (
+                        <motion.div
+                          key={r._id}
+                          initial={{ opacity: 0, x: -5 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className={`p-2 rounded-xl border transition-all
+                            ${dn ? "bg-emerald-500/10 border-emerald-500/20" : ov ? "bg-red-500/10 border-red-500/30 animate-pulse" : `bg-purple-500/5 border-white/5 hover:border-purple-500/30`}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {dn ? (
+                              <CheckCircle2
+                                size={10}
+                                className="text-emerald-500 mt-0.5 shrink-0"
+                              />
+                            ) : (
+                              <Sword
+                                size={10}
+                                className="text-purple-500 mt-0.5 shrink-0"
+                              />
+                            )}
+                            <div className="min-w-0">
+                              <p
+                                className={`font-heading text-[10px] leading-tight font-black uppercase italic truncate
+                                  ${dn ? "text-slate-500 line-through" : ov ? "text-red-400" : "text-slate-200"}`}
+                              >
+                                {r.title}
+                              </p>
+                              {!dn && (
+                                <span
+                                  className={`text-[8px] font-bold uppercase tracking-tighter ${PB[r.priority] || "text-slate-500"}`}
+                                >
+                                  {r.priority}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Empty State for Day */}
+                {dQ.length === 0 && dR.length === 0 && (
+                  <div className="h-20 flex items-center justify-center opacity-10">
+                    <Target size={24} className="text-slate-500" />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -248,16 +314,18 @@ export default function CalendarPage() {
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-4 mt-4">
+      <div className="flex flex-wrap items-center gap-6 mt-6 px-4">
         {[
-          ["bg-cyan-500/60", "Daily Quests"],
-          ["bg-purple-500/60", "Task Raids"],
-          ["bg-red-500/60", "Overdue"],
-          ["bg-emerald-500/60", "Completed"],
+          ["bg-cyan-500", "Daily Quests"],
+          ["bg-purple-500", "Task Raids"],
+          ["bg-red-500 animate-pulse", "Overdue / Crisis"],
+          ["bg-emerald-500", "Objective Cleared"],
         ].map(([c, l]) => (
-          <div key={l} className="flex items-center gap-1.5">
-            <div className={`w-2.5 h-2.5 rounded-sm ${c}`} />
-            <span className="font-heading text-xs text-slate-500">{l}</span>
+          <div key={l} className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${c} shadow-glow-sm`} />
+            <span className="font-display text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+              {l}
+            </span>
           </div>
         ))}
       </div>
@@ -267,49 +335,56 @@ export default function CalendarPage() {
         variants={staggerContainer}
         initial="initial"
         animate="animate"
-        className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-10"
       >
         {[
           {
             label: "Quests Today",
             value: `${safeQuests.filter((q) => q.status === "completed").length}/${safeQuests.length}`,
-            icon: <Scroll size={14} className="text-cyan-400" />,
+            icon: <Scroll size={16} className="text-cyan-400" />,
             color: "text-cyan-400",
+            bg: "border-cyan-500/20",
           },
           {
             label: "Raids This Week",
             value: weekRaids.length,
-            icon: <Target size={14} className="text-purple-400" />,
+            icon: <Target size={16} className="text-purple-400" />,
             color: "text-purple-400",
+            bg: "border-purple-500/20",
           },
           {
             label: "Raids Completed",
             value: weekRaids.filter((r) => r.status === "completed").length,
-            icon: <Target size={14} className="text-emerald-400" />,
+            icon: <CheckCircle2 size={16} className="text-emerald-400" />,
             color: "text-emerald-400",
+            bg: "border-emerald-500/20",
           },
           {
-            label: "Overdue",
+            label: "Overdue Threats",
             value: weekRaids.filter(
               (r) =>
                 r.dueAt &&
                 new Date(r.dueAt) < today &&
                 r.status !== "completed",
             ).length,
-            icon: <Clock size={14} className="text-red-400" />,
+            icon: <AlertCircle size={16} className="text-red-400" />,
             color: "text-red-400",
+            bg: "border-red-500/20",
           },
-        ].map(({ label, value, icon, color }) => (
+        ].map(({ label, value, icon, color, bg }) => (
           <motion.div
             key={label}
             variants={staggerItem}
-            className="glass rounded-xl p-4"
+            className={`glass-dark rounded-2xl p-5 border-t-2 ${bg} relative overflow-hidden group`}
           >
-            <div className="flex items-center gap-2 mb-2">
+            <div className="absolute -right-2 -bottom-2 opacity-5 group-hover:scale-110 transition-transform duration-500">
               {icon}
-              <span className="text-hud">{label}</span>
             </div>
-            <p className={`font-display text-2xl font-bold ${color}`}>
+            <div className="flex items-center gap-2 mb-3">
+              {icon}
+              <span className="text-hud text-[10px] font-black">{label}</span>
+            </div>
+            <p className={`font-display text-3xl font-black italic ${color}`}>
               {value}
             </p>
           </motion.div>
