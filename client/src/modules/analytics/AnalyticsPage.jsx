@@ -57,7 +57,7 @@ function detectPatterns(snapshots) {
         daySnaps.length
       : 0;
     return {
-      day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i],
+      day: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][i],
       avg: Math.floor(avg),
     };
   });
@@ -221,7 +221,7 @@ export default function AnalyticsPage() {
               <PatternCard
                 emoji="🏆"
                 label="Best Day"
-                value={bestDay.day}
+                value={patterns.bestDay.day}
                 sub={`Avg score: ${patterns.bestDay.avg}`}
                 color="text-yellow-400"
               />

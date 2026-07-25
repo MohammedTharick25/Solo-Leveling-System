@@ -7,6 +7,8 @@ import { startCronJobs } from "./src/infrastructure/scheduler/cronJobs.js";
 import config from "./src/config/env.js";
 
 const bootstrap = async () => {
+
+  
   // 1. Connect to MongoDB
   await connectDB();
 

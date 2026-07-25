@@ -4,9 +4,21 @@ import config from "../../config/env.js";
 import User from "../../modules/user/user.model.js";
 
 export const initSocket = (httpServer) => {
+  const allowedOrigins = [
+    config.CLIENT_URL,
+  ];
+
   const io = new Server(httpServer, {
     cors: {
-      origin: config.CLIENT_URL,
+      origin(origin, callback) {
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+
+        callback(new Error("Not allowed by CORS"));
+      },
       credentials: true,
     },
     pingTimeout: 60000,
