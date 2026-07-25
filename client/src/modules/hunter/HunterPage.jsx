@@ -231,10 +231,10 @@ export default function HunterPage() {
           <div className="flex items-center gap-4">
             <button
               onClick={handleShareProfile}
-              className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400 font-display text-[10px] tracking-widest hover:bg-cyan-500/20 transition-all shadow-glow-cyan-sm"
+              className="flex items-center justify-center gap-2 p-2.5 sm:px-4 sm:py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400 font-display text-[10px] tracking-widest hover:bg-cyan-500/20 transition-all shadow-glow-cyan-sm"
             >
               <Share2 size={14} />
-              SHARE ID
+              <span className="hidden sm:inline">SHARE ID</span>
             </button>
             <div className="flex bg-black/40 p-1 rounded-xl border border-slate-800">
               {["overview", "stats", "records"].map((tab) => (
@@ -273,18 +273,23 @@ export default function HunterPage() {
                   <TiltCard>
                     <div className="glass-cyan p-0 rounded-3xl border border-white/10 overflow-hidden bg-slate-950 shadow-2xl">
                       <div className="relative h-60 bg-gradient-to-t from-slate-950 to-cyan-900/40">
-                        <img
-                          src={
-                            user?.avatar?.url ||
-                            "https://res.cloudinary.com/demo/image/upload/v1631711732/avatar-placeholder.png"
-                          }
-                          alt="Hunter Avatar"
-                          className={`w-full h-full object-cover transition-all duration-700 ${isUploading ? "opacity-30 blur-sm" : "hover:scale-110"}`}
-                          onError={(e) => {
-                            e.target.src =
-                              "https://res.cloudinary.com/demo/image/upload/v1631711732/avatar-placeholder.png";
-                          }}
-                        />
+                        {user?.avatar?.url ? (
+                          <img
+                            src={user.avatar.url}
+                            alt="Hunter Avatar"
+                            className={`w-full h-full object-cover transition-all duration-700 ${
+                              isUploading
+                                ? "opacity-30 blur-sm"
+                                : "hover:scale-110"
+                            }`}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-slate-900">
+                            <span className="text-8xl font-black text-cyan-500/20 select-none">
+                              {hunter.hunterName?.[0]?.toUpperCase()}
+                            </span>
+                          </div>
+                        )}
                         <label className="absolute bottom-4 right-4 p-3 bg-black/70 rounded-full cursor-pointer hover:bg-cyan-600 transition-all border border-white/20 group">
                           {isUploading ? (
                             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

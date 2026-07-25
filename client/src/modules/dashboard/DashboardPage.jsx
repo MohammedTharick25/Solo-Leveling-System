@@ -141,14 +141,21 @@ export default function DashboardPage() {
           {/* Avatar with Rank Glow */}
           <div className="relative">
             <div className="w-20 h-20 rounded-2xl border-2 border-cyan-500/30 overflow-hidden shadow-glow-cyan-sm bg-slate-900">
-              <img
-                src={
-                  user?.avatar?.url ||
-                  "https://res.cloudinary.com/demo/image/upload/v1631711732/avatar-placeholder.png"
-                }
-                className="w-full h-full object-cover"
-                alt="Hunter Avatar"
-              />
+              {user?.avatar?.url ? (
+                <img
+                  src={user.avatar.url}
+                  alt="Hunter Avatar"
+                  className={`w-full h-full object-cover transition-all duration-700 ${
+                    isUploading ? "opacity-30 blur-sm" : "hover:scale-110"
+                  }`}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-slate-900">
+                  <span className="text-6xl font-black text-cyan-500/20 select-none">
+                    {hunter.hunterName?.[0]?.toUpperCase()}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-slate-950 rounded-lg border border-white/10 p-1">
               <img

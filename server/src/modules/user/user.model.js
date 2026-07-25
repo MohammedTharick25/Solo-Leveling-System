@@ -15,14 +15,6 @@ const awakeningSchema = new mongoose.Schema({
     type: String,
     enum: ["sedentary", "light", "moderate", "active", "athlete"],
   },
-  avatar: {
-    url: {
-      type: String,
-      default:
-        "https://res.cloudinary.com/demo/image/upload/v1631711732/avatar-placeholder.png",
-    },
-    public_id: { type: String },
-  },
   learningInterests: [String],
   currentHabits: [String],
   biggestWeaknesses: [String],
@@ -55,6 +47,10 @@ const userSchema = new mongoose.Schema(
       trim: true,
       minlength: [3, "Hunter name must be at least 3 characters"],
       maxlength: [20, "Hunter name cannot exceed 20 characters"],
+    },
+    avatar: {
+      url: { type: String, default: "" }, // Default to empty string
+      public_id: { type: String },
     },
     awakening: awakeningSchema,
     isAwakened: { type: Boolean, default: false },
