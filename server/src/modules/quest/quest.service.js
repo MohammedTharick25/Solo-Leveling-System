@@ -219,9 +219,12 @@ export const generateQuestsForUser = async (userId, io = null) => {
         isActive: true,
       });
 
-      // If no template for this category, get any template
+      // If no template for this category, get any template — but remember
+      // we did, so we don't mislabel the quest's category/stat below.
+      let usedAnyCategory = false;
       if (!templates.length) {
         templates = await QuestTemplate.find({ isActive: true }).limit(10);
+        usedAnyCategory = true;
       }
       if (!templates.length) continue;
 
@@ -241,20 +244,38 @@ export const generateQuestsForUser = async (userId, io = null) => {
         stage.difficulty || template.baseDifficulty || "D",
       );
 
+      // Use the TEMPLATE's real category/stat when we fell back to "any
+      // template" — otherwise the quest gets mislabeled (e.g. a focus
+      // template's quest tagged as "productivity" just because that was
+      // the weak stat we were originally targeting).
+      const effectiveCategory = usedAnyCategory
+        ? template.category
+        : targetStat.category;
+      const effectiveStatName = usedAnyCategory
+        ? template.targetStat
+        : targetStat.name;
+      const effectiveStatValue = usedAnyCategory
+        ? (stats?.[template.targetStat]?.value ?? 0)
+        : targetStat.value;
+
       const quest = await Quest.create({
         userId,
         templateId: template._id,
         title: stage.title,
         description: stage.description,
-        purpose: `Strengthen your ${targetStat.name} — currently ${targetStat.value}/100`,
-        category: targetStat.category,
+        purpose: usedAnyCategory
+          ? `Cross-training — building well-rounded growth`
+          : `Strengthen your ${targetStat.name} — currently ${targetStat.value}/100`,
+        category: effectiveCategory,
         difficulty: stage.difficulty || template.baseDifficulty || "D",
         xpReward,
         statRewards: template.statRewards?.length
           ? template.statRewards
-          : [{ stat: targetStat.name, amount: 3 }],
+          : [{ stat: effectiveStatName, amount: 3 }],
         expectedOutcome: template.expectedOutcome || stage.description,
-        generatedReason: `${targetStat.name} is at ${targetStat.value}/100`,
+        generatedReason: usedAnyCategory
+          ? `Rounding out today's quest set`
+          : `${targetStat.name} is at ${targetStat.value}/100`,
         targetValue: stage.targetValue || 1,
         unit: stage.unit || "",
         evolutionLevel,

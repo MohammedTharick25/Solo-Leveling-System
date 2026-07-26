@@ -4,7 +4,6 @@ dotenv.config();
 
 import QuestTemplate from "../../modules/quest/questTemplate.model.js";
 
-
 const QUEST_TEMPLATES = [
   // ── FOCUS ────────────────────────────────────────────────────────────────
   {
@@ -111,6 +110,48 @@ const QUEST_TEMPLATES = [
       },
     ],
   },
+  {
+    name: "Single-Tasking Discipline",
+    category: "focus",
+    targetStat: "sense",
+    triggerCondition: { stat: "sense", operator: "lt", threshold: 55 },
+    baseDifficulty: "D",
+    baseXP: 55,
+    expectedOutcome:
+      "Break the multitasking habit and train sustained attention.",
+    statRewards: [{ stat: "sense", amount: 3 }],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "One Tab Rule",
+        description:
+          "Work on a single task with only one browser tab/app open for 20 minutes.",
+        targetValue: 20,
+        unit: "minutes",
+        xpReward: 50,
+        difficulty: "E",
+      },
+      {
+        level: 2,
+        title: "No-Switch Block",
+        description: "Complete a 45-minute block without switching tasks.",
+        targetValue: 45,
+        unit: "minutes",
+        xpReward: 90,
+        difficulty: "D",
+      },
+      {
+        level: 3,
+        title: "Monotask Day",
+        description:
+          "Batch similar tasks and avoid context-switching for a full day.",
+        targetValue: 1,
+        unit: "day",
+        xpReward: 150,
+        difficulty: "C",
+      },
+    ],
+  },
 
   // ── DISCIPLINE ───────────────────────────────────────────────────────────
   {
@@ -212,6 +253,48 @@ const QUEST_TEMPLATES = [
           "Complete all planned tasks for the day — zero carried over.",
         targetValue: 1,
         unit: "perfect day",
+        xpReward: 180,
+        difficulty: "C",
+      },
+    ],
+  },
+  {
+    name: "No Excuses Protocol",
+    category: "discipline",
+    targetStat: "discipline",
+    triggerCondition: { stat: "discipline", operator: "lt", threshold: 45 },
+    baseDifficulty: "D",
+    baseXP: 65,
+    expectedOutcome: "Train yourself to act despite low motivation.",
+    statRewards: [{ stat: "discipline", amount: 3 }],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "Do It Anyway",
+        description:
+          "Complete one planned task even though you don't feel like it.",
+        targetValue: 1,
+        unit: "task",
+        xpReward: 50,
+        difficulty: "E",
+      },
+      {
+        level: 2,
+        title: "Commitment Streak",
+        description:
+          "Follow through on your plan for 3 consecutive days regardless of mood.",
+        targetValue: 3,
+        unit: "days",
+        xpReward: 100,
+        difficulty: "D",
+      },
+      {
+        level: 3,
+        title: "Iron Will",
+        description:
+          "Follow through on your plan for 7 consecutive days regardless of mood.",
+        targetValue: 7,
+        unit: "days",
         xpReward: 180,
         difficulty: "C",
       },
@@ -349,6 +432,50 @@ const QUEST_TEMPLATES = [
       },
     ],
   },
+  {
+    name: "Mobility Training",
+    category: "health",
+    targetStat: "strength",
+    triggerCondition: { stat: "strength", operator: "lt", threshold: 50 },
+    baseDifficulty: "D",
+    baseXP: 55,
+    expectedOutcome: "Improve flexibility and reduce injury risk.",
+    statRewards: [
+      { stat: "strength", amount: 2 },
+      { stat: "vitality", amount: 2 },
+    ],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "Stretch It Out",
+        description: "Complete a 10-minute stretching or mobility routine.",
+        targetValue: 10,
+        unit: "minutes",
+        xpReward: 45,
+        difficulty: "F",
+      },
+      {
+        level: 2,
+        title: "Mobility Habit",
+        description:
+          "Complete a 15-minute mobility routine for 3 consecutive days.",
+        targetValue: 3,
+        unit: "days",
+        xpReward: 90,
+        difficulty: "D",
+      },
+      {
+        level: 3,
+        title: "Flexibility Protocol",
+        description:
+          "Complete a 20-minute mobility/yoga session for 5 consecutive days.",
+        targetValue: 5,
+        unit: "days",
+        xpReward: 150,
+        difficulty: "C",
+      },
+    ],
+  },
 
   // ── LEARNING ─────────────────────────────────────────────────────────────
   {
@@ -452,6 +579,36 @@ const QUEST_TEMPLATES = [
       },
     ],
   },
+  {
+    name: "Curiosity Log",
+    category: "learning",
+    targetStat: "intelligence",
+    triggerCondition: { stat: "intelligence", operator: "lt", threshold: 45 },
+    baseDifficulty: "E",
+    baseXP: 45,
+    expectedOutcome: "Build a daily habit of learning something new.",
+    statRewards: [{ stat: "intelligence", amount: 2 }],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "One New Thing",
+        description: "Learn and write down one new fact or concept today.",
+        targetValue: 1,
+        unit: "fact",
+        xpReward: 40,
+        difficulty: "F",
+      },
+      {
+        level: 2,
+        title: "Curiosity Streak",
+        description: "Learn one new thing daily for 3 consecutive days.",
+        targetValue: 3,
+        unit: "days",
+        xpReward: 80,
+        difficulty: "E",
+      },
+    ],
+  },
 
   // ── COMMUNICATION ─────────────────────────────────────────────────────────
   {
@@ -506,6 +663,51 @@ const QUEST_TEMPLATES = [
       },
     ],
   },
+  {
+    name: "Public Speaking Rep",
+    category: "communication",
+    targetStat: "communication",
+    triggerCondition: { stat: "communication", operator: "lt", threshold: 55 },
+    baseDifficulty: "D",
+    baseXP: 65,
+    expectedOutcome: "Build confidence speaking and presenting to others.",
+    statRewards: [
+      { stat: "communication", amount: 3 },
+      { stat: "emotionalControl", amount: 1 },
+    ],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "Speak Up",
+        description:
+          "Voice an idea or opinion in a meeting or group setting today.",
+        targetValue: 1,
+        unit: "instance",
+        xpReward: 55,
+        difficulty: "E",
+      },
+      {
+        level: 2,
+        title: "Present Something",
+        description:
+          "Give a short presentation or explanation of an idea to someone.",
+        targetValue: 1,
+        unit: "presentation",
+        xpReward: 100,
+        difficulty: "D",
+      },
+      {
+        level: 3,
+        title: "Command the Room",
+        description:
+          "Lead a discussion or presentation for a group of 3+ people.",
+        targetValue: 1,
+        unit: "session",
+        xpReward: 170,
+        difficulty: "C",
+      },
+    ],
+  },
 
   // ── LEADERSHIP ───────────────────────────────────────────────────────────
   {
@@ -554,6 +756,46 @@ const QUEST_TEMPLATES = [
       },
     ],
   },
+  {
+    name: "Delegation Discipline",
+    category: "leadership",
+    targetStat: "leadership",
+    triggerCondition: { stat: "leadership", operator: "lt", threshold: 50 },
+    baseDifficulty: "D",
+    baseXP: 75,
+    expectedOutcome: "Practice trusting others and multiplying your impact.",
+    statRewards: [{ stat: "leadership", amount: 3 }],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "Hand It Off",
+        description: "Delegate one task you would normally do yourself.",
+        targetValue: 1,
+        unit: "task",
+        xpReward: 60,
+        difficulty: "D",
+      },
+      {
+        level: 2,
+        title: "Give Feedback",
+        description: "Give one piece of constructive feedback to a teammate.",
+        targetValue: 1,
+        unit: "feedback",
+        xpReward: 100,
+        difficulty: "C",
+      },
+      {
+        level: 3,
+        title: "Coach Someone",
+        description:
+          "Spend 20 minutes helping someone else improve at something.",
+        targetValue: 20,
+        unit: "minutes",
+        xpReward: 160,
+        difficulty: "B",
+      },
+    ],
+  },
 
   // ── TIME MANAGEMENT ───────────────────────────────────────────────────────
   {
@@ -595,6 +837,48 @@ const QUEST_TEMPLATES = [
         targetValue: 1,
         unit: "perfect day",
         xpReward: 200,
+        difficulty: "C",
+      },
+    ],
+  },
+  {
+    name: "Priority Triage",
+    category: "timeManagement",
+    targetStat: "timeManagement",
+    triggerCondition: { stat: "timeManagement", operator: "lt", threshold: 55 },
+    baseDifficulty: "D",
+    baseXP: 60,
+    expectedOutcome: "Learn to separate the urgent from the important.",
+    statRewards: [{ stat: "timeManagement", amount: 3 }],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "Top 3 Only",
+        description:
+          "Identify your top 3 priorities for the day before starting work.",
+        targetValue: 1,
+        unit: "list",
+        xpReward: 45,
+        difficulty: "F",
+      },
+      {
+        level: 2,
+        title: "Say No",
+        description:
+          "Decline or defer one low-priority request or distraction today.",
+        targetValue: 1,
+        unit: "instance",
+        xpReward: 80,
+        difficulty: "D",
+      },
+      {
+        level: 3,
+        title: "Weekly Triage",
+        description:
+          "Run a weekly priority review and reprioritize your task list.",
+        targetValue: 1,
+        unit: "review",
+        xpReward: 140,
         difficulty: "C",
       },
     ],
@@ -658,6 +942,42 @@ const QUEST_TEMPLATES = [
       },
     ],
   },
+  {
+    name: "Reaction Control",
+    category: "emotionalControl",
+    targetStat: "emotionalControl",
+    triggerCondition: {
+      stat: "emotionalControl",
+      operator: "lt",
+      threshold: 55,
+    },
+    baseDifficulty: "D",
+    baseXP: 60,
+    expectedOutcome: "Build the pause between trigger and reaction.",
+    statRewards: [{ stat: "emotionalControl", amount: 3 }],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "Count to Ten",
+        description:
+          "Pause and take 10 breaths before responding to one stressful moment today.",
+        targetValue: 1,
+        unit: "instance",
+        xpReward: 45,
+        difficulty: "F",
+      },
+      {
+        level: 2,
+        title: "Cooldown Streak",
+        description:
+          "Practice the pause-before-react technique for 3 consecutive days.",
+        targetValue: 3,
+        unit: "days",
+        xpReward: 90,
+        difficulty: "D",
+      },
+    ],
+  },
 
   // ── CREATIVITY ────────────────────────────────────────────────────────────
   {
@@ -699,6 +1019,255 @@ const QUEST_TEMPLATES = [
         unit: "minutes",
         xpReward: 160,
         difficulty: "C",
+      },
+    ],
+  },
+  {
+    name: "Constraint Challenge",
+    category: "creativity",
+    targetStat: "creativity",
+    triggerCondition: { stat: "creativity", operator: "lt", threshold: 50 },
+    baseDifficulty: "D",
+    baseXP: 60,
+    expectedOutcome: "Use constraints to force creative problem-solving.",
+    statRewards: [
+      { stat: "creativity", amount: 3 },
+      { stat: "problemSolving", amount: 2 },
+    ],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "Weird Combo",
+        description: "Combine two unrelated ideas into one new concept.",
+        targetValue: 1,
+        unit: "concept",
+        xpReward: 50,
+        difficulty: "F",
+      },
+      {
+        level: 2,
+        title: "Time-Boxed Creation",
+        description: "Create something under a strict 30-minute time limit.",
+        targetValue: 30,
+        unit: "minutes",
+        xpReward: 100,
+        difficulty: "D",
+      },
+    ],
+  },
+
+  // ── PRODUCTIVITY ──────────────────────────────────────────────────────────
+  {
+    name: "Task Raid Efficiency",
+    category: "productivity",
+    targetStat: "agility",
+    triggerCondition: { stat: "agility", operator: "lt", threshold: 45 },
+    baseDifficulty: "D",
+    baseXP: 65,
+    expectedOutcome: "Increase your speed and throughput on daily tasks.",
+    statRewards: [{ stat: "agility", amount: 4 }],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "Quick Win",
+        description:
+          "Complete one task in under 15 minutes that you'd normally put off.",
+        targetValue: 1,
+        unit: "task",
+        xpReward: 50,
+        difficulty: "E",
+      },
+      {
+        level: 2,
+        title: "Batch Processor",
+        description:
+          "Complete 3 small tasks back-to-back with no breaks between.",
+        targetValue: 3,
+        unit: "tasks",
+        xpReward: 100,
+        difficulty: "D",
+      },
+      {
+        level: 3,
+        title: "Sprint Day",
+        description:
+          "Clear your entire task backlog in a single focused sprint.",
+        targetValue: 1,
+        unit: "sprint",
+        xpReward: 180,
+        difficulty: "C",
+      },
+    ],
+  },
+  {
+    name: "Problem-Solving Sprint",
+    category: "productivity",
+    targetStat: "problemSolving",
+    triggerCondition: { stat: "problemSolving", operator: "lt", threshold: 45 },
+    baseDifficulty: "D",
+    baseXP: 70,
+    expectedOutcome:
+      "Sharpen your ability to diagnose and resolve problems quickly.",
+    statRewards: [
+      { stat: "problemSolving", amount: 4 },
+      { stat: "intelligence", amount: 1 },
+    ],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "Root Cause",
+        description:
+          "Take one recurring problem and identify its actual root cause.",
+        targetValue: 1,
+        unit: "problem",
+        xpReward: 55,
+        difficulty: "E",
+      },
+      {
+        level: 2,
+        title: "Solution Sketch",
+        description:
+          "Draft 3 possible solutions to a current problem before acting.",
+        targetValue: 3,
+        unit: "solutions",
+        xpReward: 100,
+        difficulty: "D",
+      },
+      {
+        level: 3,
+        title: "Fix It",
+        description: "Fully resolve a problem you've been putting off.",
+        targetValue: 1,
+        unit: "resolution",
+        xpReward: 170,
+        difficulty: "C",
+      },
+    ],
+  },
+  {
+    name: "Automation Instinct",
+    category: "productivity",
+    targetStat: "agility",
+    triggerCondition: { stat: "agility", operator: "lt", threshold: 55 },
+    baseDifficulty: "D",
+    baseXP: 75,
+    expectedOutcome:
+      "Reduce repeated manual effort by systematizing your work.",
+    statRewards: [
+      { stat: "agility", amount: 3 },
+      { stat: "problemSolving", amount: 2 },
+    ],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "Spot the Repeat",
+        description:
+          "Identify one repetitive task you do often and write down how to automate/simplify it.",
+        targetValue: 1,
+        unit: "task",
+        xpReward: 60,
+        difficulty: "D",
+      },
+      {
+        level: 2,
+        title: "Build the Shortcut",
+        description:
+          "Actually build or set up the automation/shortcut/template you identified.",
+        targetValue: 1,
+        unit: "automation",
+        xpReward: 130,
+        difficulty: "C",
+      },
+    ],
+  },
+
+  // ── FINANCE ───────────────────────────────────────────────────────────────
+  {
+    name: "Budget Control Protocol",
+    category: "finance",
+    targetStat: "financialIntelligence",
+    triggerCondition: {
+      stat: "financialIntelligence",
+      operator: "lt",
+      threshold: 45,
+    },
+    baseDifficulty: "D",
+    baseXP: 65,
+    expectedOutcome: "Gain awareness and control over where your money goes.",
+    statRewards: [{ stat: "financialIntelligence", amount: 4 }],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "Track It",
+        description: "Log every expense you make today, no matter how small.",
+        targetValue: 1,
+        unit: "day",
+        xpReward: 50,
+        difficulty: "E",
+      },
+      {
+        level: 2,
+        title: "Weekly Ledger",
+        description: "Track all expenses for 5 consecutive days.",
+        targetValue: 5,
+        unit: "days",
+        xpReward: 100,
+        difficulty: "D",
+      },
+      {
+        level: 3,
+        title: "Budget Built",
+        description: "Create a monthly budget with categories and limits.",
+        targetValue: 1,
+        unit: "budget",
+        xpReward: 170,
+        difficulty: "C",
+      },
+    ],
+  },
+  {
+    name: "Wealth Building Initiative",
+    category: "finance",
+    targetStat: "financialIntelligence",
+    triggerCondition: {
+      stat: "financialIntelligence",
+      operator: "lt",
+      threshold: 55,
+    },
+    baseDifficulty: "C",
+    baseXP: 85,
+    expectedOutcome:
+      "Take deliberate steps toward growing your financial position.",
+    statRewards: [{ stat: "financialIntelligence", amount: 5 }],
+    evolutionStages: [
+      {
+        level: 1,
+        title: "Learn One Concept",
+        description:
+          "Read or watch one piece of content on investing or personal finance.",
+        targetValue: 1,
+        unit: "resource",
+        xpReward: 60,
+        difficulty: "D",
+      },
+      {
+        level: 2,
+        title: "Save Something",
+        description: "Move a fixed amount into savings or investments today.",
+        targetValue: 1,
+        unit: "transfer",
+        xpReward: 110,
+        difficulty: "C",
+      },
+      {
+        level: 3,
+        title: "Cut a Cost",
+        description:
+          "Identify and cancel/reduce one recurring unnecessary expense.",
+        targetValue: 1,
+        unit: "expense",
+        xpReward: 170,
+        difficulty: "B",
       },
     ],
   },

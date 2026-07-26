@@ -19,7 +19,10 @@ export default function DailyBonusWidget() {
   const [result, setResult] = useState(null);
   const queryClient = useQueryClient();
   const { playLevelUp } = useAudio();
-  const { hunter } = useHunterStore();
+  // NOTE: also pull setHunter/setStats so we can sync the store directly
+  // instead of hoping invalidateQueries reaches whichever component owns
+  // the "hunter" query.
+  const { hunter, setHunter, setStats } = useHunterStore();
 
   // Also check server-side on mount in case localStorage was cleared
   useQuery({
@@ -43,13 +46,31 @@ export default function DailyBonusWidget() {
 
   const claimMutation = useMutation({
     mutationFn: () => api.post("/auth/daily-bonus"),
-    onSuccess: ({ data }) => {
+    onSuccess: async ({ data }) => {
       const res = data.data;
       setResult(res);
       if (!res.alreadyClaimed) {
         setClaimed(true);
         markClaimedToday();
         playLevelUp();
+
+        // ── Fix: pull the fresh hunter/stats and push straight into the
+        // store. This guarantees powerScore/XP on screen update the moment
+        // the claim resolves, instead of depending on some other mounted
+        // query's onSuccess to eventually refresh Zustand.
+        try {
+          const { data: profile } = await api.get("/hunter/me");
+          setHunter(profile.data.hunter);
+          setStats(profile.data.stats);
+        } catch (err) {
+          console.warn(
+            "[DailyBonus] Failed to refresh hunter profile after claim:",
+            err.message,
+          );
+        }
+
+        // Still invalidate so any other cached copies (e.g. React Query
+        // consumers) eventually reconcile too.
         queryClient.invalidateQueries({ queryKey: ["hunter"] });
         queryClient.invalidateQueries({ queryKey: ["quests"] });
         // Auto-hide after 4 seconds
