@@ -118,7 +118,9 @@ const STEPS = [
 ];
 
 export default function AwakeningPage() {
-  const { setUser } = useHunterStore();
+  // NOTE: also pull setHunter/setStats — we need to populate them ourselves
+  // before navigating, rather than leaving it to AppShell's background fetch.
+  const { setUser, setHunter, setStats } = useHunterStore();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
@@ -126,8 +128,28 @@ export default function AwakeningPage() {
 
   const { mutate, isPending } = useMutation({
     mutationFn: (body) => api.patch("/auth/awakening", body),
-    onSuccess: ({ data }) => {
+    onSuccess: async ({ data }) => {
       setUser(data.data.user);
+
+      // ── Fix: populate hunter/stats in the store BEFORE navigating.
+      // Previously we relied on AppShell's useQuery(["hunter"]) to fetch
+      // and sync this in the background after landing on /dashboard. If
+      // that fetch raced the backend's Hunter/Stats creation (or hit any
+      // transient error), it settled into an error state and never
+      // retried — leaving `hunter` null in the store, so
+      // DashboardPage's `if (!hunter) return null;` rendered nothing
+      // until some other page happened to populate the store later.
+      try {
+        const { data: profile } = await api.get("/hunter/me");
+        setHunter(profile.data.hunter);
+        setStats(profile.data.stats);
+      } catch (err) {
+        console.warn(
+          "[Awakening] Failed to preload hunter profile before redirect:",
+          err.message,
+        );
+      }
+
       navigate("/dashboard");
     },
   });

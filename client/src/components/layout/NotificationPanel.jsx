@@ -102,7 +102,7 @@ export default function NotificationPanel({ onClose }) {
       transition={{ duration: 0.15, ease: "easeOut" }}
       className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden
                  border border-slate-700/60
-                 bg-slate-950/98 backdrop-blur-xl
+                 bg-slate-900/80 backdrop-blur-xl
                  shadow-[0_20px_60px_rgba(0,0,0,0.8)]"
       style={{ zIndex: 99999 }}
     >
@@ -119,7 +119,7 @@ export default function NotificationPanel({ onClose }) {
           {unreadCount > 0 && (
             <span
               className="min-w-[18px] h-[18px] px-1 rounded-full
-                              bg-cyan-500/20 border border-cyan-500/40
+                              bg-cyan-600/20 border border-cyan-500/40
                               text-cyan-400 text-[9px] font-bold font-display
                               flex items-center justify-center"
             >
@@ -134,8 +134,8 @@ export default function NotificationPanel({ onClose }) {
               onClick={() => markAllMutation.mutate()}
               disabled={markAllMutation.isPending}
               title="Mark all as read"
-              className="p-1.5 rounded-lg text-slate-500 hover:text-cyan-400
-                         hover:bg-cyan-500/10 transition-all"
+              className="p-1.5 rounded-lg text-slate-600 hover:text-cyan-400
+                         hover:bg-cyan-600/10 transition-all"
             >
               <CheckCheck size={14} />
             </button>
@@ -203,13 +203,13 @@ export default function NotificationPanel({ onClose }) {
                 <div className="flex-1 min-w-0">
                   <p
                     className={`font-heading text-xs font-semibold leading-snug
-                                  ${notif.isRead ? "text-slate-500" : "text-slate-200"}`}
+                                  ${notif.isRead ? "text-slate-300" : "text-slate-200"}`}
                   >
                     {notif.title}
                   </p>
                   <p
                     className={`font-body text-xs mt-0.5 leading-relaxed line-clamp-2
-                                  ${notif.isRead ? "text-slate-600" : "text-slate-400"}`}
+                                  ${notif.isRead ? "text-slate-400" : "text-slate-400"}`}
                   >
                     {notif.message}
                   </p>
