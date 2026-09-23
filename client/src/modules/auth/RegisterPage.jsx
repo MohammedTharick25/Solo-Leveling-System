@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Zap, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import api from "../../lib/api.js";
 import { useHunterStore } from "../../stores/hunterStore.js";
@@ -41,12 +41,11 @@ export default function RegisterPage() {
         className="w-full max-w-md relative z-10"
       >
         <motion.div variants={staggerItem} className="text-center mb-10">
-          <div
-            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl
-                          bg-purple-500/15 border border-purple-500/40 shadow-glow-purple mb-4"
-          >
-            <Zap size={24} className="text-purple-400" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Solo Leveling"
+            className="block mx-auto w-14 h-14 rounded-2xl shadow-glow-purple mb-4"
+          />
           <h1 className="font-display text-lg font-bold text-gradient-hero tracking-widest mb-1">
             SOLO LEVELING
           </h1>

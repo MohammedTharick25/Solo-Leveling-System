@@ -59,6 +59,8 @@ const userSchema = new mongoose.Schema(
     country: { type: String, default: "Unknown" },
     timezone: { type: String, default: "UTC" },
     lastLoginAt: Date,
+    passwordResetTokenHash: { type: String, select: false, default: null },
+    passwordResetExpiresAt: { type: Date, select: false, default: null },
   },
   { timestamps: true },
 );

@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 export const useSocket = () => {
   const queryClient = useQueryClient();
   const socketRef = useRef(null);
-  const { token, pushToast, triggerLevelUp, triggerRankUp } = useHunterStore();
+  const { token, pushToast, triggerLevelUp, triggerRankUp, addNotification } = useHunterStore();
 
   useEffect(() => {
     if (!token) return;
@@ -30,6 +30,12 @@ export const useSocket = () => {
 
     socket.on("connect_error", (err) => {
       console.warn("[SOCKET] Connection error:", err.message);
+    });
+
+    socket.on("notification:new", (notification) => {
+      addNotification(notification);
+      pushToast(notification.type, notification.title, notification.message, { incrementUnread: false });
+      queryClient.invalidateQueries({ queryKey: ["notifications-badge"] });
     });
 
     // ── Level Up — triggers cinematic + toast ───────────────────────────

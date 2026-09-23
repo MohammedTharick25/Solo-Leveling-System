@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import config from "../../config/env.js";
 import User from "../user/user.model.js";
 import Hunter from "../hunter/hunter.model.js";
@@ -7,6 +8,10 @@ import Notification from "../notification/notification.model.js";
 import * as authRepo from "./auth.repository.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
 import { startOfDay, endOfDay } from "../../lib/helpers.js";
+import { createNotification } from "../notification/notification.service.js";
+import { sendEmail } from "../../lib/email/mailer.js";
+import { loginNotificationEmail, passwordResetEmail } from "../../lib/email/templates.js";
+import { getClientIp, parseDeviceInfo } from "../../lib/deviceInfo.js";
 
 const generateTokens = (userId) => {
   const accessToken = jwt.sign({ userId }, config.JWT_SECRET, {
@@ -49,7 +54,7 @@ export const register = async ({ email, password, hunterName }) => {
   return { user: user.toSafeObject(), accessToken, refreshToken };
 };
 
-export const login = async ({ email, password }) => {
+export const login = async ({ email, password, request }) => {
   const user = await User.findOne({ email }).select("+password");
   if (!user) throw new AppError("Invalid email or password.", 401);
   if (!user.isActive) throw new AppError("Account deactivated.", 401);
@@ -64,6 +69,39 @@ export const login = async ({ email, password }) => {
   const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
   await authRepo.saveRefreshToken(user._id, refreshToken, expiresAt);
 
+  const io = request?.app?.get("io");
+  const { device, browser, os } = parseDeviceInfo(request?.headers?.["user-agent"] || "");
+  const ip = getClientIp(request);
+  const loginTime = new Date().toLocaleString("en-IN", {
+    timeZone: user.timezone || "UTC",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+
+  await createNotification(
+    user._id,
+    "systemAlert",
+    "NEW LOGIN DETECTED",
+    `A new login was detected from ${device} using ${browser} on ${os}.`,
+    { device, browser, os, ip, loginTime, event: "login" },
+    io,
+  );
+
+  // Security email is intentionally non-blocking: a mail provider outage must not reject a valid login.
+  try {
+    const email = await loginNotificationEmail({
+      hunterName: user.hunterName,
+      device,
+      browser,
+      os,
+      ip,
+      time: loginTime,
+    });
+    await sendEmail({ to: user.email, ...email });
+  } catch (emailError) {
+    console.error("[EMAIL] Login alert failed:", emailError.message);
+  }
+
   // Auto-generate today's quests if awakened and none exist yet
   if (user.isAwakened) {
     try {
@@ -74,6 +112,65 @@ export const login = async ({ email, password }) => {
   }
 
   return { user: user.toSafeObject(), accessToken, refreshToken };
+};
+
+export const requestPasswordReset = async (email) => {
+  const user = await User.findOne({ email: String(email).trim().toLowerCase() }).select("+passwordResetTokenHash +passwordResetExpiresAt");
+
+  // Always return success to avoid account enumeration.
+  if (!user || !user.isActive) return;
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const expiresAt = new Date(Date.now() + config.PASSWORD_RESET_EXPIRY_MINUTES * 60 * 1000);
+
+  user.passwordResetTokenHash = tokenHash;
+  user.passwordResetExpiresAt = expiresAt;
+  await user.save({ validateBeforeSave: false });
+
+  const resetUrl = `${config.CLIENT_URL}/reset-password?token=${rawToken}`;
+  const message = await passwordResetEmail({
+    hunterName: user.hunterName,
+    resetUrl,
+    expiresMinutes: config.PASSWORD_RESET_EXPIRY_MINUTES,
+  });
+
+  try {
+    await sendEmail({ to: user.email, ...message });
+  } catch (emailError) {
+    user.passwordResetTokenHash = null;
+    user.passwordResetExpiresAt = null;
+    await user.save({ validateBeforeSave: false });
+    throw new AppError("Unable to send the password reset email. Please try again later.", 503);
+  }
+};
+
+export const resetPassword = async (rawToken, newPassword) => {
+  if (!rawToken) throw new AppError("Reset token is required.", 400);
+
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const user = await User.findOne({
+    passwordResetTokenHash: tokenHash,
+    passwordResetExpiresAt: { $gt: new Date() },
+  }).select("+password +passwordResetTokenHash +passwordResetExpiresAt");
+
+  if (!user) throw new AppError("This password reset link is invalid or has expired.", 400);
+
+  user.password = newPassword;
+  user.passwordResetTokenHash = null;
+  user.passwordResetExpiresAt = null;
+  await user.save();
+
+  // A password change invalidates every existing refresh session.
+  await authRepo.revokeAllUserTokens(user._id);
+
+  await Notification.create({
+    userId: user._id,
+    type: "systemAlert",
+    title: "PASSWORD UPDATED",
+    message: "Your password was changed successfully. Existing sessions have been signed out for your security.",
+    metadata: { event: "password-reset" },
+  });
 };
 
 export const refreshTokens = async (token) => {

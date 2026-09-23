@@ -18,6 +18,19 @@ export const registerValidators = [
   validate,
 ];
 
+export const passwordResetRequestValidators = [
+  body("email").isEmail().normalizeEmail().withMessage("Valid email required"),
+  validate,
+];
+
+export const passwordResetValidators = [
+  body("token").notEmpty().withMessage("Reset token required"),
+  body("newPassword")
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters"),
+  validate,
+];
+
 export const loginValidators = [
   body("email").isEmail().normalizeEmail().withMessage("Valid email required"),
   body("password").notEmpty().withMessage("Password required"),
@@ -32,7 +45,7 @@ export const register = asyncHandler(async (req, res) => {
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const result = await authService.login({ email, password });
+  const result = await authService.login({ email, password, request: req });
   // Set refresh token in httpOnly cookie
   res.cookie("refreshToken", result.refreshToken, {
     httpOnly: true,
@@ -64,6 +77,17 @@ export const logout = asyncHandler(async (req, res) => {
   await authService.logout(token);
   res.clearCookie("refreshToken");
   sendSuccess(res, {}, "Logged out successfully.");
+});
+
+export const requestPasswordReset = asyncHandler(async (req, res) => {
+  await authService.requestPasswordReset(req.body.email);
+  sendSuccess(res, {}, "If an account exists for that email, a password reset link has been sent.");
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  await authService.resetPassword(req.body.token, req.body.newPassword);
+  res.clearCookie("refreshToken");
+  sendSuccess(res, {}, "Password reset successfully. You can now sign in with your new password.");
 });
 
 export const completeAwakening = asyncHandler(async (req, res) => {

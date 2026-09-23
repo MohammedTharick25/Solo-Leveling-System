@@ -50,12 +50,11 @@ export default function LoginPage() {
       >
         {/* Logo */}
         <motion.div variants={staggerItem} className="text-center mb-10">
-          <div
-            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl
-                          bg-cyan-500/15 border border-cyan-500/40 shadow-glow-cyan mb-4"
-          >
-            <Zap size={24} className="text-cyan-400" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Solo Leveling"
+            className="block mx-auto w-14 h-14 rounded-2xl shadow-glow-cyan mb-4"
+          />
           <h1 className="font-display text-lg font-bold text-gradient-hero tracking-widest mb-1">
             SOLO LEVELING
           </h1>
@@ -143,7 +142,11 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center font-body text-sm text-slate-500">
+          <div className="mt-5 text-center">
+            <Link to="/forgot-password" className="font-body text-xs text-cyan-400 hover:text-cyan-300">Forgot password?</Link>
+          </div>
+
+          <p className="mt-4 text-center font-body text-sm text-slate-500">
             No account?{" "}
             <Link
               to="/register"

@@ -25,6 +25,14 @@ const config = {
   CLOUDINARY_SECRET:process.env.CLOUDINARY_SECRET,
 
   BCRYPT_ROUNDS: 12,
+
+  SMTP_HOST: process.env.SMTP_HOST,
+  SMTP_PORT: parseInt(process.env.SMTP_PORT, 10) || 587,
+  SMTP_SECURE: String(process.env.SMTP_SECURE || "false").toLowerCase() === "true",
+  SMTP_USER: process.env.SMTP_USER,
+  SMTP_PASS: process.env.SMTP_PASS,
+  EMAIL_FROM: process.env.EMAIL_FROM || "Solo Leveling <no-reply@localhost>",
+  PASSWORD_RESET_EXPIRY_MINUTES: parseInt(process.env.PASSWORD_RESET_EXPIRY_MINUTES, 10) || 30,
 };
 
 export default config;

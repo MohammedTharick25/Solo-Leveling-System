@@ -26,6 +26,14 @@ export const useHunterStore = create(
       setNotifications: (notifications, unreadCount) =>
         set({ notifications, unreadCount }),
 
+      setUnreadCount: (unreadCount) => set({ unreadCount }),
+
+      addNotification: (notification) =>
+        set((state) => ({
+          notifications: [notification, ...state.notifications.filter((n) => n._id !== notification._id)].slice(0, 50),
+          unreadCount: state.unreadCount + (notification.isRead ? 0 : 1),
+        })),
+
       markNotifRead: (id) =>
         set((state) => {
           const notif = state.notifications.find((n) => n._id === id);
@@ -52,7 +60,7 @@ export const useHunterStore = create(
       // They are NOT stored in the bell panel
       toastQueue: [],
 
-      pushToast: (type, title, message) =>
+      pushToast: (type, title, message, options = {}) =>
         set((state) => ({
           toastQueue: [
             {
@@ -64,8 +72,8 @@ export const useHunterStore = create(
             },
             ...state.toastQueue,
           ].slice(0, 5), // max 5 toasts at once
-          // Also increment unread badge so bell lights up
-          unreadCount: state.unreadCount + 1,
+          // Toasts that are not backed by a server notification should still light the bell.
+          unreadCount: state.unreadCount + (options.incrementUnread === false ? 0 : 1),
         })),
 
       removeToast: (id) =>

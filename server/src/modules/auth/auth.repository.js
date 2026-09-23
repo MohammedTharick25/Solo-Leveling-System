@@ -19,3 +19,5 @@ export const revokeAllUserTokens = async (userId) => {
 export const cleanExpiredTokens = async () => {
   return RefreshToken.deleteMany({ expiresAt: { $lt: new Date() } });
 };
+
+export const revokeAllRefreshTokens = (userId) => RefreshToken.updateMany({ userId, isRevoked: false }, { isRevoked: true });

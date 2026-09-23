@@ -10,6 +10,10 @@ import {
   refreshToken,
   logout,
   completeAwakening,
+  requestPasswordReset,
+  resetPassword,
+  passwordResetRequestValidators,
+  passwordResetValidators,
 } from "./auth.controller.js";
 import { claimDailyBonus } from "./auth.service.js";
 
@@ -17,6 +21,8 @@ const router = Router();
 
 router.post("/register", authRateLimiter, registerValidators, register);
 router.post("/login", authRateLimiter, loginValidators, login);
+router.post("/forgot-password", authRateLimiter, passwordResetRequestValidators, requestPasswordReset);
+router.post("/reset-password", authRateLimiter, passwordResetValidators, resetPassword);
 router.post("/refresh-token", refreshToken);
 router.post("/logout", logout);
 router.patch("/awakening", protect, completeAwakening);

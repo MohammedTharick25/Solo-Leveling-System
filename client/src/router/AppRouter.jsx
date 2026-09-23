@@ -7,6 +7,8 @@ import ErrorBoundary from '../components/ui/ErrorBoundary.jsx';
 import LoginPage     from '../modules/auth/LoginPage.jsx';
 import RegisterPage  from '../modules/auth/RegisterPage.jsx';
 import AwakeningPage from '../modules/auth/AwakeningPage.jsx';
+import ForgotPasswordPage from '../modules/auth/ForgotPasswordPage.jsx';
+import ResetPasswordPage from '../modules/auth/ResetPasswordPage.jsx';
 
 const DashboardPage       = lazy(() => import('../modules/dashboard/DashboardPage.jsx'));
 const HunterPage          = lazy(() => import('../modules/hunter/HunterPage.jsx'));
@@ -47,6 +49,8 @@ export default function AppRouter() {
     <Routes>
       <Route path="/login"      element={<AuthRoute><LoginPage /></AuthRoute>} />
       <Route path="/register"   element={<AuthRoute><RegisterPage /></AuthRoute>} />
+      <Route path="/forgot-password" element={<AuthRoute><ForgotPasswordPage /></AuthRoute>} />
+      <Route path="/reset-password" element={<AuthRoute><ResetPasswordPage /></AuthRoute>} />
       <Route path="/awakening"  element={<AwakeningPage />} />
       <Route path="/h/:hunterId" element={<Wrap><PublicHunterProfile /></Wrap>} />
 

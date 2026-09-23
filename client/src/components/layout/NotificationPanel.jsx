@@ -213,6 +213,12 @@ export default function NotificationPanel({ onClose }) {
                   >
                     {notif.message}
                   </p>
+                  {notif.metadata?.event === "login" && (
+                    <div className="mt-1.5 text-[10px] text-slate-500 leading-relaxed">
+                      <span>{notif.metadata.device || "Device"}</span> · <span>{notif.metadata.browser || "Browser"}</span> · <span>{notif.metadata.os || "OS"}</span>
+                      {notif.metadata.ip && <><br />IP: {notif.metadata.ip}</>}
+                    </div>
+                  )}
                   <p className="font-body text-[10px] text-slate-700 mt-1">
                     {timeAgo(notif.createdAt)}
                   </p>

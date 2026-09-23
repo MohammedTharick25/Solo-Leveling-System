@@ -16,7 +16,6 @@ import {
   Settings,
   LogOut,
   X,
-  Zap,
   CheckSquare,
   Trophy,
   Calendar,
@@ -108,9 +107,11 @@ function SidebarContent({ hunter, user, rankColor, onLogout, onNav }) {
     <>
       <div className="p-5 border-b border-slate-800/60">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shadow-glow-cyan-sm">
-            <Zap size={16} className="text-cyan-400" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Solo Leveling"
+            className="w-8 h-8 rounded-lg shadow-glow-cyan-sm"
+          />
           <div>
             <p className="font-display text-xs text-cyan-400 tracking-widest">
               SOLO LEVELING

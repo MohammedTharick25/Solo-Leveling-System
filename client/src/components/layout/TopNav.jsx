@@ -1,4 +1,6 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import api from "../../lib/api.js";
 import { Menu, Bell, Flame, Star } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useHunterStore } from "../../stores/hunterStore.js";
@@ -9,6 +11,19 @@ export default function TopNav({ onMenuClick }) {
   const { hunter, unreadCount } = useHunterStore();
   const [notifOpen, setNotifOpen] = useState(false);
   const rankColor = RANK_COLORS[hunter?.rank] || "text-slate-400";
+
+  // Keep the badge current even when the notification panel is closed.
+  useQuery({
+    queryKey: ["notifications-badge"],
+    queryFn: async () => {
+      const { data } = await api.get("/notifications?limit=1");
+      useHunterStore.getState().setUnreadCount(data.data.unreadCount);
+      return data.data.unreadCount;
+    },
+    refetchInterval: 30000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+  });
 
   const handleBellClick = (e) => {
     e.stopPropagation();
