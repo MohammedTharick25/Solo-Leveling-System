@@ -2,7 +2,7 @@
 
 **Solo Leveling System**
 
-Copyright (c) 2026 **YOUR NAME / YOUR ORGANIZATION**
+Copyright (c) 2026 **Mohammed Tharick**
 
 ---
 
@@ -51,4 +51,4 @@ notice remain included with the software.
 
 **License:** MIT  
 **Project:** Solo Leveling System  
-**Copyright:** © 2026 YOUR NAME / YOUR ORGANIZATION
+**Copyright:** © 2026 Mohammed Tharick
