@@ -803,13 +803,13 @@ Include:
 
 ## 📄 License
 
-Add the project's chosen license here before publishing the repository publicly.
+This project is licensed under the **MIT License**.
 
-Example:
+The MIT License permits you to use, copy, modify, merge, publish, distribute,
+sublicense, and sell copies of the software, subject to the conditions of the
+license.
 
-```text
-MIT License
-```
+For the complete license terms, see the [`LICENSE.md`](./LICENSE.md) file.
 
 ---
 
