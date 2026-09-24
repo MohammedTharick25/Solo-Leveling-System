@@ -1,174 +1,194 @@
 import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import { useHunterStore } from "../stores/hunterStore.js";
-import { queryClient } from "../lib/queryClient.js";
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from "@tanstack/react-query";
+
+const CATEGORY_BY_TYPE = {
+  questAssigned: "questUpdates",
+  questCompleted: "questUpdates",
+  questFailed: "questUpdates",
+  levelUp: "progression",
+  rankUp: "progression",
+  shadowUnlocked: "progression",
+  shadowEvolved: "progression",
+  bossAppeared: "progression",
+  bossDefeated: "progression",
+  dungeonCompleted: "progression",
+  achievementUnlocked: "progression",
+  streakMilestone: "progression",
+  systemWarning: "progression",
+  systemUpdate: "progression",
+  weeklyReport: "weeklyReports",
+  friendRequest: "social",
+  friendAccepted: "social",
+  guildInvite: "social",
+  guildChallenge: "social",
+};
+
+const eventCategory = (event) => {
+  if (event === "system:quest-assigned" || event === "system:daily-quests-complete") return "questUpdates";
+  if (event === "system:level-up" || event === "system:rank-up" || event === "system:shadow-unlocked" || event === "system:shadow-evolved" || event === "system:boss-appeared" || event === "system:boss-defeated" || event === "system:achievement" || event === "system:streak-broken" || event === "dungeon:completed" || event === "dungeon:entered") return "progression";
+  return "progression";
+};
+
+const canInApp = (category) => {
+  const settings = useHunterStore.getState().settings?.notifications;
+  if (!settings) return true;
+  return settings.enabled !== false && settings.inApp !== false && settings[category] !== false;
+};
+
+const canDesktop = (category) => {
+  const settings = useHunterStore.getState().settings?.notifications;
+  return Boolean(settings?.enabled !== false && settings?.desktop && settings?.[category] !== false);
+};
+
+const showDesktopNotification = async (title, message, tag, category) => {
+  if (!canDesktop(category || eventCategory(tag))) return;
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    if (registration) {
+      await registration.showNotification(title, {
+        body: message,
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        tag: `solo-${tag}`,
+      });
+    } else {
+      new Notification(title, { body: message, icon: "/icon-192.png", tag: `solo-${tag}` });
+    }
+  } catch {}
+};
+
+const deliverSystemEvent = (event, title, message, pushToast) => {
+  const category = eventCategory(event);
+  if (canInApp(category)) pushToast(eventToToastType(event), title, message, { incrementUnread: false });
+  if (canDesktop(category)) showDesktopNotification(title, message, event, category);
+};
+
+const eventToToastType = (event) => {
+  const map = {
+    "system:level-up": "levelUp",
+    "system:rank-up": "rankUp",
+    "system:shadow-unlocked": "shadowUnlocked",
+    "system:shadow-evolved": "shadowEvolved",
+    "system:boss-appeared": "bossAppeared",
+    "system:boss-defeated": "bossDefeated",
+    "system:achievement": "achievementUnlocked",
+    "system:streak-broken": "systemWarning",
+    "system:quest-assigned": "questAssigned",
+    "system:daily-quests-complete": "questCompleted",
+    "dungeon:completed": "questCompleted",
+    "dungeon:entered": "questCompleted",
+  };
+  return map[event] || "systemAlert";
+};
 
 export const useSocket = () => {
   const queryClient = useQueryClient();
   const socketRef = useRef(null);
-  const { token, pushToast, triggerLevelUp, triggerRankUp, addNotification } = useHunterStore();
+  const token = useHunterStore((state) => state.token);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) return undefined;
 
-    const socket = io(
-      import.meta.env.VITE_SOCKET_URL || "http://localhost:5000",
-      {
-        auth: { token },
-        transports: ["websocket"],
-        reconnectionAttempts: 5,
-        reconnectionDelay: 2000,
-      },
-    );
+    const store = useHunterStore.getState();
+    const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000", {
+      auth: { token },
+      transports: ["websocket"],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
+    });
 
     socketRef.current = socket;
 
-    socket.on("connect", () => {
-      console.log("[SOCKET] Connected to The System");
-    });
-
-    socket.on("connect_error", (err) => {
-      console.warn("[SOCKET] Connection error:", err.message);
-    });
+    socket.on("connect", () => console.log("[SOCKET] Connected to The System"));
+    socket.on("connect_error", (err) => console.warn("[SOCKET] Connection error:", err.message));
 
     socket.on("notification:new", (notification) => {
-      addNotification(notification);
-      pushToast(notification.type, notification.title, notification.message, { incrementUnread: false });
+      const category = notification.metadata?.event === "login" || notification.metadata?.event === "password-reset"
+        ? "securityAlerts"
+        : CATEGORY_BY_TYPE[notification.type] || "progression";
+      const settings = useHunterStore.getState().settings?.notifications;
+      const enabled = !settings || (settings.enabled !== false && settings[category] !== false);
+
+      if (!enabled) return;
+
+      if (settings?.inApp !== false) {
+        useHunterStore.getState().addNotification(notification);
+      }
+      if (settings?.desktop) {
+        showDesktopNotification(notification.title, notification.message, notification.type, category);
+      }
       queryClient.invalidateQueries({ queryKey: ["notifications-badge"] });
     });
 
-    // ── Level Up — triggers cinematic + toast ───────────────────────────
     socket.on("system:level-up", (data) => {
-      triggerLevelUp(data);
-      pushToast(
-        "levelUp",
-        `LEVEL UP — ${data.newLevel}`,
-        `+${data.xpEarned} XP earned. Keep pushing.`,
-      );
+      if (canInApp("progression")) store.triggerLevelUp(data);
+      deliverSystemEvent("system:level-up", `LEVEL UP — ${data.newLevel}`, `+${data.xpEarned} XP earned. Keep pushing.`, store.pushToast);
       queryClient.invalidateQueries({ queryKey: ["hunter"] });
     });
 
-    // ── Rank Up — triggers cinematic + toast ────────────────────────────
     socket.on("system:rank-up", (data) => {
-      triggerRankUp(data);
-      pushToast(
-        "rankUp",
-        `RANK PROMOTION — ${data.newRank}`,
-        `You have ascended from ${data.previousRank} to ${data.newRank} Rank.`,
-      );
+      if (canInApp("progression")) store.triggerRankUp(data);
+      deliverSystemEvent("system:rank-up", `RANK PROMOTION — ${data.newRank}`, `You have ascended from ${data.previousRank} to ${data.newRank} Rank.`, store.pushToast);
       queryClient.invalidateQueries({ queryKey: ["hunter"] });
     });
 
-    // ── Quest events ────────────────────────────────────────────────────
     socket.on("system:quest-assigned", ({ count }) => {
-      pushToast(
-        "questAssigned",
-        "DAILY QUESTS ASSIGNED",
-        `${count} new quests assigned. Complete all 5 to maintain your streak.`,
-      );
+      deliverSystemEvent("system:quest-assigned", "DAILY QUESTS ASSIGNED", `${count} new quests assigned. Complete all 5 to maintain your streak.`, store.pushToast);
       queryClient.invalidateQueries({ queryKey: ["quests"] });
     });
 
-
     socket.on("system:streak-broken", ({ lostStreak, xpPenalty }) => {
-      pushToast(
-        "systemWarning",
-        "⚠️ STREAK BROKEN",
-        `Your ${lostStreak}-day streak has ended. −${xpPenalty} XP penalty.`,
-      );
+      deliverSystemEvent("system:streak-broken", "⚠️ STREAK BROKEN", `Your ${lostStreak}-day streak has ended. −${xpPenalty} XP penalty.`, store.pushToast);
       queryClient.invalidateQueries({ queryKey: ["hunter"] });
     });
 
-    // ── Shadow events ───────────────────────────────────────────────────
     socket.on("system:shadow-unlocked", ({ shadow }) => {
-      pushToast(
-        "shadowUnlocked",
-        "SHADOW UNLOCKED",
-        `${shadow.name} has emerged from the abyss.`,
-      );
+      deliverSystemEvent("system:shadow-unlocked", "SHADOW UNLOCKED", `${shadow.name} has emerged from the abyss.`, store.pushToast);
       queryClient.invalidateQueries({ queryKey: ["shadows"] });
     });
 
     socket.on("system:shadow-evolved", ({ shadow }) => {
-      pushToast(
-        "shadowEvolved",
-        "SHADOW EVOLUTION",
-        `${shadow.name} has evolved to ${shadow.evolutionStage}.`,
-      );
+      deliverSystemEvent("system:shadow-evolved", "SHADOW EVOLUTION", `${shadow.name} has evolved to ${shadow.evolutionStage}.`, store.pushToast);
       queryClient.invalidateQueries({ queryKey: ["shadows"] });
     });
 
-    // ── Boss events ─────────────────────────────────────────────────────
     socket.on("system:boss-appeared", ({ boss }) => {
-      pushToast(
-        "bossAppeared",
-        `⚠️ BOSS APPEARED`,
-        `${boss.name} has manifested. Defeat it to claim rare rewards.`,
-      );
+      deliverSystemEvent("system:boss-appeared", "⚠️ BOSS APPEARED", `${boss.name} has manifested. Defeat it to claim rare rewards.`, store.pushToast);
       queryClient.invalidateQueries({ queryKey: ["boss"] });
     });
 
     socket.on("system:boss-defeated", ({ boss }) => {
-      pushToast(
-        "bossDefeated",
-        "BOSS DEFEATED",
-        `${boss.name} has been vanquished. "${boss.titleReward}" title unlocked.`,
-      );
+      deliverSystemEvent("system:boss-defeated", "BOSS DEFEATED", `${boss.name} has been vanquished. "${boss.titleReward}" title unlocked.`, store.pushToast);
       queryClient.invalidateQueries({ queryKey: ["boss"] });
       queryClient.invalidateQueries({ queryKey: ["hunter"] });
     });
 
-    // ── Achievement ─────────────────────────────────────────────────────
     socket.on("system:achievement", ({ achievement }) => {
-      pushToast(
-        "achievementUnlocked",
-        `ACHIEVEMENT — ${achievement.name}`,
-        achievement.description,
-      );
+      deliverSystemEvent("system:achievement", `ACHIEVEMENT — ${achievement.name}`, achievement.description, store.pushToast);
       queryClient.invalidateQueries({ queryKey: ["achievements"] });
     });
 
-    // ── Dungeon completed ───────────────────────────────────────────────
     socket.on("dungeon:completed", ({ dungeon }) => {
-      pushToast(
-        "questCompleted",
-        "DUNGEON CLEARED",
-        `${dungeon.name} has been conquered.`,
-      );
+      deliverSystemEvent("dungeon:completed", "DUNGEON CLEARED", `${dungeon.name} has been conquered.`, store.pushToast);
       queryClient.invalidateQueries({ queryKey: ["dungeons"] });
     });
 
     socket.on("system:daily-quests-complete", ({ total }) => {
-      pushToast(
-        "questCompleted",
-        "🎉 ALL DAILY QUESTS COMPLETE",
-        `All ${total} quests completed. Streak maintained!`,
-      );
+      deliverSystemEvent("system:daily-quests-complete", "🎉 ALL DAILY QUESTS COMPLETE", `All ${total || "daily"} quests completed. Streak maintained!`, store.pushToast);
       queryClient.invalidateQueries({ queryKey: ["hunter"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-quests-today"] });
     });
 
-    socket.on("system:daily-quests-complete", (data) => {
-      pushToast(
-        "questCompleted",
-        "🎉 ALL DAILY QUESTS COMPLETE",
-        `All quests completed. Streak maintained!`,
-      );
-  // Refresh hunter data (streak, total completions)
-  queryClient.invalidateQueries({ queryKey: ['hunter'] });
-  // Refresh quest list
-  queryClient.invalidateQueries({ queryKey: ['calendar-quests-today'] });
-});
-
-    socket.on("disconnect", () => {
-      console.log("[SOCKET] Disconnected from The System");
-    });
+    socket.on("disconnect", () => console.log("[SOCKET] Disconnected from The System"));
 
     return () => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [token]);
+  }, [token, queryClient]);
 
   return socketRef.current;
 };

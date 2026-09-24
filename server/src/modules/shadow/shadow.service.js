@@ -4,6 +4,7 @@ import Quest from "../quest/quest.model.js";
 import FocusSession from "../focusSession/focusSession.model.js";
 import { createNotification } from "../notification/notification.service.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
+import { emitToUser } from "../../infrastructure/socket/socketManager.js";
 
 const EVOLUTION_XP_THRESHOLDS = {
   Initiate: 0,
@@ -126,7 +127,7 @@ export const checkShadowUnlocks = async (userId, io = null) => {
 
     newShadows.push(shadow);
 
-    if (io) io.to(`user:${userId}`).emit("system:shadow-unlocked", { shadow });
+    if (io) await emitToUser(io, userId, "system:shadow-unlocked", { shadow }, "progression");
     await createNotification(
       userId,
       "shadowUnlocked",
@@ -154,7 +155,7 @@ export const addShadowXP = async (shadowId, userId, xpAmount, io = null) => {
     shadow.evolutionStage = nextStage;
     shadow.visualVariant = currentStageIdx + 2;
 
-    if (io) io.to(`user:${userId}`).emit("system:shadow-evolved", { shadow });
+    if (io) await emitToUser(io, userId, "system:shadow-evolved", { shadow }, "progression");
     await createNotification(
       userId,
       "shadowEvolved",

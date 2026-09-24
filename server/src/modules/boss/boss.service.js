@@ -4,6 +4,7 @@ import { awardXP } from "../hunter/hunter.service.js";
 import { createNotification } from "../notification/notification.service.js";
 import Hunter from "../hunter/hunter.model.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
+import { emitToUser } from "../../infrastructure/socket/socketManager.js";
 
 const BOSS_DEFINITIONS = [
   {
@@ -204,7 +205,7 @@ export const checkBossSpawn = async (userId, io = null) => {
     spawnedByCondition: bossDefinition.spawnedByCondition,
   });
 
-  if (io) io.to(`user:${userId}`).emit("system:boss-appeared", { boss });
+  if (io) await emitToUser(io, userId, "system:boss-appeared", { boss }, "progression");
   await createNotification(
     userId,
     "bossAppeared",
@@ -262,7 +263,7 @@ export const completeBossChallenge = async (
       await hunter.save();
     }
 
-    if (io) io.to(`user:${userId}`).emit("system:boss-defeated", { boss });
+    if (io) await emitToUser(io, userId, "system:boss-defeated", { boss }, "progression");
     await createNotification(
       userId,
       "bossDefeated",

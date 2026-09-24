@@ -3,6 +3,7 @@ import { sendSuccess, asyncHandler } from "../../lib/helpers.js";
 import { projectFutureSelf } from "../../lib/xpFormulas.js";
 import Hunter from "./hunter.model.js";
 import Stats from "../stats/stats.model.js";
+import { AppError } from "../../middleware/errorHandler.middleware.js";
 
 export const getMyProfile = asyncHandler(async (req, res) => {
   const { hunter, stats } = await hunterService.getHunterProfile(req.userId);
@@ -16,20 +17,27 @@ export const getPublicCard = asyncHandler(async (req, res) => {
     )
     .populate({
       path: "userId",
-      select: "avatar",
+      select: "avatar bio country settings",
     });
 
-  if (!hunter) {
-    throw new AppError("Hunter not found.", 404);
+  if (!hunter) throw new AppError("Hunter not found.", 404);
+
+  const privacy = hunter.userId?.settings?.privacy || {};
+  if (privacy.publicProfile === false) {
+    throw new AppError("This Hunter profile is private.", 403);
   }
 
-  const stats = await Stats.findOne({ userId: req.params.id });
+  const stats = privacy.showPublicStats === false
+    ? null
+    : await Stats.findOne({ userId: req.params.id });
   const hunterObj = hunter.toObject();
 
-  // Map the avatar from the populated userId object to the hunter object
-  if (hunter.userId && hunter.userId.avatar) {
-    hunterObj.avatar = hunter.userId.avatar;
-  }
+  if (hunter.userId?.avatar) hunterObj.avatar = hunter.userId.avatar;
+  hunterObj.bio = hunter.userId?.bio || "";
+  hunterObj.country = hunter.userId?.country || "";
+  hunterObj.achievements = privacy.showPublicAchievements === false ? [] : hunterObj.achievements;
+
+  delete hunterObj.userId;
 
   sendSuccess(res, { hunter: hunterObj, stats }, "Hunter card retrieved.");
 });

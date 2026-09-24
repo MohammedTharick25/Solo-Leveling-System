@@ -26,7 +26,7 @@ export const parseDeviceInfo = (userAgent = "") => {
     "Unknown browser",
   );
 
-  const os = firstMatch(
+  let os = firstMatch(
     ua,
     [
       [/Windows NT 10/i, "Windows 10/11"],
@@ -48,5 +48,23 @@ export const parseDeviceInfo = (userAgent = "") => {
         ? "Tablet"
         : "Desktop";
 
-  return { device, browser, os };
+  let model = "";
+  if (/Android/i.test(ua)) {
+    const match = ua.match(/Android[^;)]*;\s*(?:[a-z]{2}(?:-[A-Z]{2})?;\s*)?(?:wv;\s*)?([^;)]+?)(?:\s+Build\/[^;)]+)?[;)]/i);
+    if (match?.[1]) model = match[1].trim();
+  } else if (/iPhone/i.test(ua)) {
+    model = "iPhone";
+  } else if (/iPad/i.test(ua)) {
+    model = "iPad";
+  } else if (/Windows/i.test(ua)) {
+    model = "Windows PC";
+  } else if (/Macintosh|Mac OS X/i.test(ua)) {
+    model = "Mac";
+  } else if (/Linux/i.test(ua)) {
+    model = "Linux PC";
+  }
+
+  const deviceName = model ? `${model} · ${device}` : device;
+
+  return { device, browser, os, model: model || device, deviceName };
 };

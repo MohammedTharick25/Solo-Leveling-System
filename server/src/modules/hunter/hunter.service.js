@@ -10,6 +10,7 @@ import {
 import { createNotification } from "../notification/notification.service.js";
 import { startOfDay, endOfDay, clamp } from "../../lib/helpers.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
+import { emitToUser } from "../../infrastructure/socket/socketManager.js";
 
 /**
  * Award XP to a hunter. Handles level-ups and rank-ups.
@@ -39,11 +40,11 @@ export const awardXP = async (userId, baseXP, io = null) => {
 
   if (newLevel > previousLevel) {
     if (io)
-      io.to(`user:${userId}`).emit("system:level-up", {
+      await emitToUser(io, userId, "system:level-up", {
         newLevel,
         previousLevel,
         xpEarned,
-      });
+      }, "progression");
     await createNotification(
       userId,
       "levelUp",
@@ -69,7 +70,7 @@ export const awardXP = async (userId, baseXP, io = null) => {
     }
 
     if (io)
-      io.to(`user:${userId}`).emit("system:rank-up", { newRank, previousRank });
+      await emitToUser(io, userId, "system:rank-up", { newRank, previousRank }, "progression");
 
     await createNotification(
       userId,
@@ -283,10 +284,10 @@ export const checkAndUpdateStreaks = async (userId, io = null) => {
     );
 
     if (io) {
-      io.to(`user:${userId}`).emit("system:streak-broken", {
+      await emitToUser(io, userId, "system:streak-broken", {
         lostStreak,
         xpPenalty,
-      });
+      }, "progression");
     }
   }
 };

@@ -6,6 +6,7 @@ import Boss from "../boss/boss.model.js";
 import KnowledgeNote from "../brain/knowledgeNote.model.js";
 import Journal from "../journal/journal.model.js";
 import { createNotification } from "../notification/notification.service.js";
+import { emitToUser } from "../../infrastructure/socket/socketManager.js";
 
 // ── Achievement Definitions ───────────────────────────────────────────────────
 export const ACHIEVEMENTS = [
@@ -360,7 +361,7 @@ export const checkAndAwardAchievements = async (userId, io = null) => {
     );
 
     if (io) {
-      io.to(`user:${userId}`).emit("system:achievement", { achievement });
+      await emitToUser(io, userId, "system:achievement", { achievement }, "progression");
     }
   }
 

@@ -1,23 +1,23 @@
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { randomUUID } from "crypto";
 import config from "../../config/env.js";
 import User from "../user/user.model.js";
 import Hunter from "../hunter/hunter.model.js";
 import Stats from "../stats/stats.model.js";
-import Notification from "../notification/notification.model.js";
 import * as authRepo from "./auth.repository.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
 import { startOfDay, endOfDay } from "../../lib/helpers.js";
 import { createNotification } from "../notification/notification.service.js";
 import { sendEmail } from "../../lib/email/mailer.js";
-import { loginNotificationEmail, passwordResetEmail } from "../../lib/email/templates.js";
+import { passwordResetEmail } from "../../lib/email/templates.js";
 import { getClientIp, parseDeviceInfo } from "../../lib/deviceInfo.js";
 
-const generateTokens = (userId) => {
-  const accessToken = jwt.sign({ userId }, config.JWT_SECRET, {
+const generateTokens = (userId, sessionId) => {
+  const accessToken = jwt.sign({ userId, sessionId }, config.JWT_SECRET, {
     expiresIn: config.JWT_ACCESS_EXPIRY,
   });
-  const refreshToken = jwt.sign({ userId }, config.JWT_REFRESH_SECRET, {
+  const refreshToken = jwt.sign({ userId, sessionId }, config.JWT_REFRESH_SECRET, {
     expiresIn: config.JWT_REFRESH_EXPIRY,
   });
   return { accessToken, refreshToken };
@@ -27,17 +27,18 @@ const bootstrapHunterProfile = async (userId, hunterName) => {
   await Promise.all([
     Hunter.create({ userId, hunterName }),
     Stats.create({ userId }),
-    Notification.create({
+    createNotification(
       userId,
-      type: "systemAlert",
-      title: "SYSTEM ALERT",
-      message: `Welcome, ${hunterName}. The System has detected your awakening potential. Complete your assessment to unlock your true power.`,
-      metadata: { isWelcome: true },
-    }),
+      "systemAlert",
+      "SYSTEM ALERT",
+      `Welcome, ${hunterName}. The System has detected your awakening potential. Complete your assessment to unlock your true power.`,
+      { isWelcome: true },
+      null,
+    ),
   ]);
 };
 
-export const register = async ({ email, password, hunterName }) => {
+export const register = async ({ email, password, hunterName, request = null }) => {
   const existingEmail = await User.findOne({ email });
   if (existingEmail) throw new AppError("Email already registered.", 409);
 
@@ -47,9 +48,15 @@ export const register = async ({ email, password, hunterName }) => {
   const user = await User.create({ email, password, hunterName });
   await bootstrapHunterProfile(user._id, hunterName);
 
-  const { accessToken, refreshToken } = generateTokens(user._id);
+  const sessionId = randomUUID();
+  const { accessToken, refreshToken } = generateTokens(user._id, sessionId);
   const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
-  await authRepo.saveRefreshToken(user._id, refreshToken, expiresAt);
+  const { device, browser, os, model, deviceName } = parseDeviceInfo(request?.headers?.["user-agent"] || "");
+  await authRepo.saveRefreshToken(user._id, refreshToken, expiresAt, {
+    sessionId, device, deviceName, browser, os, model,
+    ipAddress: request ? getClientIp(request) : "Unknown",
+    userAgent: request?.headers?.["user-agent"] || "",
+  });
 
   return { user: user.toSafeObject(), accessToken, refreshToken };
 };
@@ -65,12 +72,17 @@ export const login = async ({ email, password, request }) => {
   user.lastLoginAt = new Date();
   await user.save({ validateBeforeSave: false });
 
-  const { accessToken, refreshToken } = generateTokens(user._id);
+  const sessionId = randomUUID();
+  const { accessToken, refreshToken } = generateTokens(user._id, sessionId);
   const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
-  await authRepo.saveRefreshToken(user._id, refreshToken, expiresAt);
 
   const io = request?.app?.get("io");
-  const { device, browser, os } = parseDeviceInfo(request?.headers?.["user-agent"] || "");
+  const { device, browser, os, model, deviceName } = parseDeviceInfo(request?.headers?.["user-agent"] || "");
+  await authRepo.saveRefreshToken(user._id, refreshToken, expiresAt, {
+    sessionId, device, deviceName, browser, os, model,
+    ipAddress: getClientIp(request),
+    userAgent: request?.headers?.["user-agent"] || "",
+  });
   const ip = getClientIp(request);
   const loginTime = new Date().toLocaleString("en-IN", {
     timeZone: user.timezone || "UTC",
@@ -82,25 +94,10 @@ export const login = async ({ email, password, request }) => {
     user._id,
     "systemAlert",
     "NEW LOGIN DETECTED",
-    `A new login was detected from ${device} using ${browser} on ${os}.`,
-    { device, browser, os, ip, loginTime, event: "login" },
+    `A new login was detected from ${deviceName} using ${browser} on ${os}.`,
+    { device, deviceName, browser, os, model, ip, loginTime, event: "login" },
     io,
   );
-
-  // Security email is intentionally non-blocking: a mail provider outage must not reject a valid login.
-  try {
-    const email = await loginNotificationEmail({
-      hunterName: user.hunterName,
-      device,
-      browser,
-      os,
-      ip,
-      time: loginTime,
-    });
-    await sendEmail({ to: user.email, ...email });
-  } catch (emailError) {
-    console.error("[EMAIL] Login alert failed:", emailError.message);
-  }
 
   // Auto-generate today's quests if awakened and none exist yet
   if (user.isAwakened) {
@@ -164,13 +161,14 @@ export const resetPassword = async (rawToken, newPassword) => {
   // A password change invalidates every existing refresh session.
   await authRepo.revokeAllUserTokens(user._id);
 
-  await Notification.create({
-    userId: user._id,
-    type: "systemAlert",
-    title: "PASSWORD UPDATED",
-    message: "Your password was changed successfully. Existing sessions have been signed out for your security.",
-    metadata: { event: "password-reset" },
-  });
+  await createNotification(
+    user._id,
+    "systemAlert",
+    "PASSWORD UPDATED",
+    "Your password was changed successfully. Existing sessions have been signed out for your security.",
+    { event: "password-reset" },
+    null,
+  );
 };
 
 export const refreshTokens = async (token) => {
@@ -187,11 +185,21 @@ export const refreshTokens = async (token) => {
     throw new AppError("Refresh token revoked or not found.", 401);
 
   await authRepo.revokeRefreshToken(token);
+  const sessionId = decoded.sessionId || storedToken.sessionId || randomUUID();
   const { accessToken, refreshToken: newRefreshToken } = generateTokens(
     decoded.userId,
+    sessionId,
   );
   const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
-  await authRepo.saveRefreshToken(decoded.userId, newRefreshToken, expiresAt);
+  await authRepo.saveRefreshToken(decoded.userId, newRefreshToken, expiresAt, {
+    sessionId,
+    device: storedToken.device,
+    deviceName: storedToken.deviceName,
+    browser: storedToken.browser,
+    os: storedToken.os,
+    ipAddress: storedToken.ipAddress,
+    userAgent: storedToken.userAgent,
+  });
   return { accessToken, refreshToken: newRefreshToken };
 };
 
@@ -210,14 +218,14 @@ export const completeAwakening = async (userId, awakeningData) => {
   );
   if (!user) throw new AppError("User not found.", 404);
 
-  await Notification.create({
+  await createNotification(
     userId,
-    type: "systemAlert",
-    title: "AWAKENING COMPLETE",
-    message:
-      "The System has analyzed your potential. Your first daily quests have been assigned. The hunt begins now.",
-    metadata: { isAwakening: true },
-  });
+    "systemAlert",
+    "AWAKENING COMPLETE",
+    "The System has analyzed your potential. Your first daily quests have been assigned. The hunt begins now.",
+    { isAwakening: true },
+    null,
+  );
 
   // Generate first day's quests immediately after awakening
   try {

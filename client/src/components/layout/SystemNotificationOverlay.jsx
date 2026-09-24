@@ -118,7 +118,9 @@ const TOAST_TYPES = new Set([
 ]);
 
 export default function SystemNotificationOverlay() {
-  const { toastQueue, removeToast } = useHunterStore();
+  const { toastQueue, removeToast, settings } = useHunterStore();
+
+  if (settings?.notifications?.enabled === false || settings?.notifications?.inApp === false) return null;
 
   return (
     <div

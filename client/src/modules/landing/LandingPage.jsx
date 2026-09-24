@@ -279,7 +279,7 @@ export default function LandingPage() {
             <motion.div initial={{ opacity: 0, scale: .96, x: 18 }} animate={{ opacity: 1, scale: 1, x: 0 }} transition={{ duration: .8, delay: .15 }} className="relative mx-auto w-full max-w-xl lg:max-w-none">
               <div className="absolute inset-0 rounded-[40px] bg-cyan-500/10 blur-[80px]" />
               <div className="relative overflow-hidden rounded-[30px] border border-white/[0.08] bg-slate-950/75 p-2 shadow-2xl shadow-black/60">
-                <img src="/og-image.png" alt="Solo Leveling System preview" className="aspect-[1.9/1] w-full rounded-[24px] object-cover object-center opacity-95" />
+                <img src="/og-image.jpg" alt="Solo Leveling System preview" className="aspect-[1.9/1] w-full rounded-[24px] object-cover object-center opacity-95" />
                 <div className="absolute inset-x-7 bottom-7 rounded-2xl border border-white/10 bg-[#030712]/75 p-4 backdrop-blur-xl">
                   <div className="flex items-center justify-between gap-3">
                     <div>

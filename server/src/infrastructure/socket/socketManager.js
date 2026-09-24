@@ -96,9 +96,36 @@ export const initSocket = (httpServer) => {
 
 // ── Emit helpers used by services ────────────────────────────────────────────
 
-export const emitToUser = (io, userId, event, data) => {
-  if (!io) return;
+const EVENT_CATEGORY = {
+  "system:quest-assigned": "questUpdates",
+  "system:daily-quests-complete": "questUpdates",
+  "system:level-up": "progression",
+  "system:rank-up": "progression",
+  "system:shadow-unlocked": "progression",
+  "system:shadow-evolved": "progression",
+  "system:boss-appeared": "progression",
+  "system:boss-defeated": "progression",
+  "system:achievement": "progression",
+  "system:streak-broken": "progression",
+  "dungeon:completed": "progression",
+  "dungeon:entered": "progression",
+  "notification:new": "progression",
+};
+
+export const emitToUser = async (io, userId, event, data, category = EVENT_CATEGORY[event]) => {
+  if (!io) return false;
+  const user = await User.findById(userId).select("settings.notifications isActive").lean();
+  if (!user || !user.isActive) return false;
+
+  const n = user.settings?.notifications || {};
+  if (n.enabled === false) return false;
+  if (category && n[category] === false) return false;
+  if (n.inApp === false && n.desktop === false) return false;
+
+  // The persistent in-app notification channel is handled by createNotification.
+  // Socket events are allowed for the corresponding category while enabled.
   io.to(`user:${userId}`).emit(event, data);
+  return true;
 };
 
 export const emitToGuild = (io, guildId, event, data) => {

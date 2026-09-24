@@ -9,8 +9,10 @@ export const useHunterStore = create(
       // ── Auth ─────────────────────────────────────────────────────────
       token: null,
       user: null,
+      settings: null,
       setToken: (token) => set({ token }),
-      setUser: (user) => set({ user }),
+      setUser: (user) => set({ user, ...(user?.settings ? { settings: user.settings } : {}) }),
+      setSettings: (settings) => set({ settings }),
 
       // ── Hunter ───────────────────────────────────────────────────────
       hunter: null,
@@ -71,9 +73,9 @@ export const useHunterStore = create(
               createdAt: Date.now(),
             },
             ...state.toastQueue,
-          ].slice(0, 5), // max 5 toasts at once
-          // Toasts that are not backed by a server notification should still light the bell.
-          unreadCount: state.unreadCount + (options.incrementUnread === false ? 0 : 1),
+          ].slice(0, 5),
+          // Toasts are ephemeral UI. Server notifications are responsible for unread counts.
+          unreadCount: state.unreadCount + (options.incrementUnread === true ? 1 : 0),
         })),
 
       removeToast: (id) =>
@@ -94,6 +96,7 @@ export const useHunterStore = create(
         set({
           token: null,
           user: null,
+          settings: null,
           hunter: null,
           stats: null,
           notifications: [],
@@ -106,7 +109,7 @@ export const useHunterStore = create(
     {
       name: "solo-leveling-store",
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ token: state.token, user: state.user }),
+      partialize: (state) => ({ token: state.token, user: state.user, settings: state.settings }),
     },
   ),
 );

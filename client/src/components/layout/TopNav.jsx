@@ -8,7 +8,7 @@ import { RANK_COLORS, formatXP } from "../../lib/xpFormulas.js";
 import NotificationPanel from "./NotificationPanel.jsx";
 
 export default function TopNav({ onMenuClick }) {
-  const { hunter, unreadCount } = useHunterStore();
+  const { hunter, unreadCount, settings } = useHunterStore();
   const [notifOpen, setNotifOpen] = useState(false);
   const rankColor = RANK_COLORS[hunter?.rank] || "text-slate-400";
 
@@ -16,6 +16,11 @@ export default function TopNav({ onMenuClick }) {
   useQuery({
     queryKey: ["notifications-badge"],
     queryFn: async () => {
+      const currentSettings = useHunterStore.getState().settings?.notifications;
+      if (currentSettings?.enabled === false || currentSettings?.inApp === false) {
+        useHunterStore.getState().setUnreadCount(0);
+        return 0;
+      }
       const { data } = await api.get("/notifications?limit=1");
       useHunterStore.getState().setUnreadCount(data.data.unreadCount);
       return data.data.unreadCount;
@@ -81,6 +86,7 @@ export default function TopNav({ onMenuClick }) {
       )}
 
       {/* Bell button + panel container */}
+      {(!settings?.notifications || (settings.notifications.enabled !== false && settings.notifications.inApp !== false)) && (
       <div className="relative flex items-center">
         <button
           onClick={handleBellClick}
@@ -110,6 +116,7 @@ export default function TopNav({ onMenuClick }) {
           )}
         </AnimatePresence>
       </div>
+      )}
     </header>
   );
 }

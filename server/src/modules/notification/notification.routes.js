@@ -10,11 +10,7 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
-    const result = await notificationService.getNotifications(
-      req.userId,
-      page,
-      limit,
-    );
+    const result = await notificationService.getNotifications(req.userId, page, limit);
     sendSuccess(res, result, "Notifications retrieved.");
   }),
 );
@@ -22,10 +18,7 @@ router.get(
 router.patch(
   "/:id/read",
   asyncHandler(async (req, res) => {
-    const notification = await notificationService.markAsRead(
-      req.params.id,
-      req.userId,
-    );
+    const notification = await notificationService.markAsRead(req.params.id, req.userId);
     sendSuccess(res, { notification }, "Notification marked as read.");
   }),
 );
@@ -35,6 +28,14 @@ router.patch(
   asyncHandler(async (req, res) => {
     await notificationService.markAllAsRead(req.userId);
     sendSuccess(res, {}, "All notifications marked as read.");
+  }),
+);
+
+router.delete(
+  "/",
+  asyncHandler(async (req, res) => {
+    await notificationService.clearNotifications(req.userId);
+    sendSuccess(res, {}, "Notification history cleared.");
   }),
 );
 

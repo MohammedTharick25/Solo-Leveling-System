@@ -39,7 +39,7 @@ export const loginValidators = [
 
 export const register = asyncHandler(async (req, res) => {
   const { email, password, hunterName } = req.body;
-  const result = await authService.register({ email, password, hunterName });
+  const result = await authService.register({ email, password, hunterName, request: req });
   sendSuccess(res, result, "Hunter registered successfully.", 201);
 });
 

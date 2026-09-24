@@ -1,6 +1,7 @@
 import Dungeon from "./dungeon.model.js";
 import { awardXP, updateStreak } from "../hunter/hunter.service.js";
 import { createNotification } from "../notification/notification.service.js";
+import { emitToUser } from "../../infrastructure/socket/socketManager.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
 import { sendSuccess, asyncHandler } from "../../lib/helpers.js";
 import { Router } from "express";
@@ -168,7 +169,7 @@ export const enterDungeon = async (userId, type, io = null) => {
     startedAt: new Date(),
   });
 
-  if (io) io.to(`user:${userId}`).emit("dungeon:entered", { dungeon });
+  if (io) await emitToUser(io, userId, "dungeon:entered", { dungeon }, "progression");
 
   return dungeon;
 };
@@ -219,7 +220,7 @@ export const completeChallenge = async (
       updateStreak(userId, io),
     ]);
 
-    if (io) io.to(`user:${userId}`).emit("dungeon:completed", { dungeon });
+    if (io) await emitToUser(io, userId, "dungeon:completed", { dungeon }, "progression");
     await createNotification(
       userId,
       "dungeonCompleted",

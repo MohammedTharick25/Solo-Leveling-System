@@ -180,7 +180,13 @@ export default function PublicHunterProfile() {
                     )}
                   </div>
 
-                  <div className="w-full space-y-4">
+                  {hunter.bio && (
+                    <p className="w-full text-sm leading-relaxed text-slate-400 mb-6">
+                      {hunter.bio}
+                    </p>
+                  )}
+
+                  {stats && <div className="w-full space-y-4">
                     <StatItem
                       icon={<Activity size={14} />}
                       label="Power Score"
@@ -199,38 +205,39 @@ export default function PublicHunterProfile() {
                       value={`Top ${hunter.percentile || 1}%`}
                       color="text-purple-400"
                     />
-                  </div>
+                  </div>}
                 </div>
 
                 {/* Right Column: Radar Chart & Sub-Stats */}
                 <div className="lg:col-span-7 space-y-8">
-                  <div className="bg-slate-950/40 rounded-3xl p-6 border border-white/5 backdrop-blur-sm">
-                    <p className="font-display text-[10px] text-slate-500 tracking-[0.3em] uppercase mb-4 text-center">
-                      Attribute Distribution
-                    </p>
-                    <div className="h-64 sm:h-80">
-                      <PowerRadar stats={stats} />
-                    </div>
-                  </div>
+                  {stats ? (
+                    <>
+                      <div className="bg-slate-950/40 rounded-3xl p-6 border border-white/5 backdrop-blur-sm">
+                        <p className="font-display text-[10px] text-slate-500 tracking-[0.3em] uppercase mb-4 text-center">
+                          Attribute Distribution
+                        </p>
+                        <div className="h-64 sm:h-80">
+                          <PowerRadar stats={stats} />
+                        </div>
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <MiniMetric
-                      label="Total XP"
-                      value={formatXP(hunter.totalXP)}
-                      sub="Lifetime"
-                    />
-                    <MiniMetric
-                      label="Daily Streak"
-                      value={`${hunter.currentStreak}d`}
-                      sub="Current"
-                    />
-                  </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <MiniMetric label="Total XP" value={formatXP(hunter.totalXP)} sub="Lifetime" />
+                        <MiniMetric label="Daily Streak" value={`${hunter.currentStreak}d`} sub="Current" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="h-full min-h-64 flex items-center justify-center rounded-3xl bg-slate-950/40 border border-white/5 text-center p-8">
+                      <div><Shield size={28} className="mx-auto text-slate-600 mb-3" /><p className="font-heading text-sm text-slate-400">Public stats are hidden.</p><p className="text-xs text-slate-600 mt-1">This Hunter has limited public visibility.</p></div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
           {/* Achievements Section - Non-Downloaded */}
+          {hunter.achievements?.length > 0 && <>
           <SectionHeader
             title="Top Achievements"
             icon={<Trophy className="text-yellow-500" />}
@@ -245,6 +252,7 @@ export default function PublicHunterProfile() {
               <AchievementIcon key={a.id} achievement={a} />
             ))}
           </motion.div>
+          </>}
 
           <p className="text-center font-display text-[10px] text-slate-600 tracking-[0.5em] uppercase pt-8">
             ── End of system record ──

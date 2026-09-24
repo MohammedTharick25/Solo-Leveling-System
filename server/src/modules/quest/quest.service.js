@@ -10,6 +10,7 @@ import {
 import { checkShadowUnlocks } from "../shadow/shadow.service.js";
 import { checkBossSpawn } from "../boss/boss.service.js";
 import { createNotification } from "../notification/notification.service.js";
+import { emitToUser } from "../../infrastructure/socket/socketManager.js";
 import { questXPReward } from "../../lib/xpFormulas.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
 import { checkAndAwardAchievements } from "../achievements/achievement.service.js";
@@ -292,9 +293,9 @@ export const generateQuestsForUser = async (userId, io = null) => {
       `[QUEST] Generated ${newQuests.length} quests for user ${userId}`,
     );
     if (io)
-      io.to(`user:${userId}`).emit("system:quest-assigned", {
+      await emitToUser(io, userId, "system:quest-assigned", {
         count: newQuests.length,
-      });
+      }, "questUpdates");
     await createNotification(
       userId,
       "questAssigned",
@@ -416,10 +417,10 @@ export const completeQuest = async (questId, userId, io = null) => {
   const { total, completed, allDone } = await getTodaysQuests(userId);
   if (allDone) {
     if (io)
-      io.to(`user:${userId}`).emit("system:daily-quests-complete", {
+      await emitToUser(io, userId, "system:daily-quests-complete", {
         total,
         completed,
-      });
+      }, "questUpdates");
     await createNotification(
       userId,
       "systemAlert",

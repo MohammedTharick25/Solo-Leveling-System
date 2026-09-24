@@ -8,7 +8,19 @@ import { useHunterStore } from "../../stores/hunterStore.js";
 
 export default function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { setHunter, setStats } = useHunterStore();
+  const { setHunter, setStats, setSettings } = useHunterStore();
+
+  // Fetch server-side settings on every authenticated app mount so notification
+  // and preference changes survive refreshes and are never based only on localStorage.
+  useQuery({
+    queryKey: ["user-settings"],
+    queryFn: async () => {
+      const { data } = await api.get("/users/me/settings");
+      setSettings(data.data.settings);
+      return data.data;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
 
   // Fetch hunter profile on mount
   useQuery({
