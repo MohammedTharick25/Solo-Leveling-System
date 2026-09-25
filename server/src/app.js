@@ -33,6 +33,10 @@ import goalRoutes from "./modules/goals/goal.routes.js";
 
 const app = express();
 
+// Render runs behind a reverse proxy.
+// Trust the first proxy so Express can safely use X-Forwarded-For.
+app.set("trust proxy", 1);
+
 // ── Security ─────────────────────────────────────────────────────────────────
 app.use(
   helmet({
