@@ -28,6 +28,8 @@ const AchievementsPage     = lazy(() => import('../modules/achievements/Achievem
 const SocialPage           = lazy(() => import('../modules/social/SocialPage.jsx'));
 const CalendarPage         = lazy(() => import('../modules/calendar/CalendarPage.jsx'));
 const SettingsPage         = lazy(() => import('../modules/settings/SettingsPage.jsx'));
+const AICoachPage           = lazy(() => import('../modules/ai/AICoachPage.jsx'));
+const GoalsPage              = lazy(() => import('../modules/goals/GoalsPage.jsx'));
 
 const ProtectedRoute = ({ children }) => {
   const { token, user } = useHunterStore();
@@ -79,6 +81,8 @@ export default function AppRouter() {
         <Route path="social" element={<Wrap><SocialPage /></Wrap>} />
         <Route path="calendar" element={<Wrap><CalendarPage /></Wrap>} />
         <Route path="settings" element={<Wrap><SettingsPage /></Wrap>} />
+        <Route path="ai-coach" element={<Wrap><AICoachPage /></Wrap>} />
+        <Route path="goals" element={<Wrap><GoalsPage /></Wrap>} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

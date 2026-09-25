@@ -10,6 +10,7 @@ import {
   refreshToken,
   logout,
   completeAwakening,
+  awakeningValidators,
   requestPasswordReset,
   resetPassword,
   passwordResetRequestValidators,
@@ -25,7 +26,7 @@ router.post("/forgot-password", authRateLimiter, passwordResetRequestValidators,
 router.post("/reset-password", authRateLimiter, passwordResetValidators, resetPassword);
 router.post("/refresh-token", refreshToken);
 router.post("/logout", logout);
-router.patch("/awakening", protect, completeAwakening);
+router.patch("/awakening", protect, awakeningValidators, completeAwakening);
 
 router.post(
   "/daily-bonus",

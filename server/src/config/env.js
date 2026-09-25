@@ -20,19 +20,29 @@ const config = {
   RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000,
   RATE_LIMIT_MAX: 100,
 
-  CLOUDINARY_NAME:process.env.CLOUDINARY_NAME,
-  CLOUDINARY_KEY:process.env.CLOUDINARY_KEY,
-  CLOUDINARY_SECRET:process.env.CLOUDINARY_SECRET,
+  CLOUDINARY_NAME: process.env.CLOUDINARY_NAME,
+  CLOUDINARY_KEY: process.env.CLOUDINARY_KEY,
+  CLOUDINARY_SECRET: process.env.CLOUDINARY_SECRET,
 
   BCRYPT_ROUNDS: 12,
 
   SMTP_HOST: process.env.SMTP_HOST,
   SMTP_PORT: parseInt(process.env.SMTP_PORT, 10) || 587,
-  SMTP_SECURE: String(process.env.SMTP_SECURE || "false").toLowerCase() === "true",
+  SMTP_SECURE:
+    String(process.env.SMTP_SECURE || "false").toLowerCase() === "true",
   SMTP_USER: process.env.SMTP_USER,
   SMTP_PASS: process.env.SMTP_PASS,
   EMAIL_FROM: process.env.EMAIL_FROM || "Solo Leveling <no-reply@localhost>",
-  PASSWORD_RESET_EXPIRY_MINUTES: parseInt(process.env.PASSWORD_RESET_EXPIRY_MINUTES, 10) || 30,
+  PASSWORD_RESET_EXPIRY_MINUTES:
+    parseInt(process.env.PASSWORD_RESET_EXPIRY_MINUTES, 10) || 30,
+
+  // AI uses the Groq free tier. No paid SDK is required; Node's native fetch
+  // calls the OpenAI-compatible endpoint directly. If no key is configured,
+  // the System falls back to deterministic local coaching.
+  AI_PROVIDER: process.env.AI_PROVIDER || "groq",
+  GROQ_API_KEY: process.env.GROQ_API_KEY,
+  GROQ_MODEL: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
+  AI_MAX_OUTPUT_TOKENS: parseInt(process.env.AI_MAX_OUTPUT_TOKENS, 10) || 700,
 };
 
 export default config;

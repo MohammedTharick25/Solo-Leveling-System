@@ -28,6 +28,8 @@ import notificationRoutes from "./modules/notification/notification.routes.js";
 import reportRoutes from "./modules/report/report.routes.js";
 import habitRoutes from "./modules/habits/habit.routes.js";
 import achievementRoutes from "./modules/achievements/achievement.routes.js";
+import aiRoutes from "./modules/ai/ai.routes.js";
+import goalRoutes from "./modules/goals/goal.routes.js";
 
 const app = express();
 
@@ -130,6 +132,8 @@ app.use(`${API}/notifications`, notificationRoutes);
 app.use(`${API}/reports`, reportRoutes);
 app.use(`${API}/habits`, habitRoutes);
 app.use(`${API}/achievements`, achievementRoutes);
+app.use(`${API}/ai`, aiRoutes);
+app.use(`${API}/goals`, goalRoutes);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {

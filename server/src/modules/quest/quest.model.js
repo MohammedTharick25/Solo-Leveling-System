@@ -12,6 +12,15 @@ const questSchema = new mongoose.Schema(
       ref: "QuestTemplate",
       default: null,
     },
+    goalId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Goal",
+      default: null,
+    },
+    goalQuestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
     title: { type: String, required: true },
     description: { type: String, required: true },
     purpose: String,

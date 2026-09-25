@@ -3,24 +3,25 @@ import bcrypt from "bcryptjs";
 import config from "../../config/env.js";
 
 const awakeningSchema = new mongoose.Schema({
-  age: { type: Number, min: 10, max: 100 },
-  occupation: String,
-  isStudent: Boolean,
-  goals: [String],
+  age: { type: Number, required: [true, "Age is required"], min: 10, max: 100 },
+  occupation: { type: String, required: [true, "Occupation / field is required"], trim: true, maxlength: 120 },
+  isStudent: { type: Boolean, required: [true, "Student status is required"] },
+  goals: { type: [String], required: true, validate: { validator: (value) => value.length >= 1 && value.length <= 3, message: "Provide between 1 and 3 goals" } },
   dailySchedule: {
-    wakeTime: String,
-    sleepTime: String,
+    wakeTime: { type: String, required: [true, "Wake time is required"] },
+    sleepTime: { type: String, required: [true, "Sleep time is required"] },
   },
   fitnessLevel: {
     type: String,
+    required: [true, "Fitness level is required"],
     enum: ["sedentary", "light", "moderate", "active", "athlete"],
   },
-  learningInterests: [String],
+  learningInterests: { type: [String], required: true, validate: { validator: (value) => value.length >= 1, message: "Provide at least one learning interest" } },
   currentHabits: [String],
-  biggestWeaknesses: [String],
-  biggestStrengths: [String],
-  availableDailyMinutes: Number,
-  longTermVision: String,
+  biggestWeaknesses: { type: [String], required: true, validate: { validator: (value) => value.length >= 1, message: "Provide at least one weakness" } },
+  biggestStrengths: { type: [String], required: true, validate: { validator: (value) => value.length >= 1, message: "Provide at least one strength" } },
+  availableDailyMinutes: { type: Number, required: [true, "Available daily minutes are required"], min: 10, max: 1440 },
+  longTermVision: { type: String, required: [true, "Long-term vision is required"], trim: true, maxlength: 500 },
   completedAt: Date,
 });
 

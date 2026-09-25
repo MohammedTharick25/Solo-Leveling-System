@@ -19,6 +19,7 @@ import {
   CheckSquare,
   Trophy,
   Calendar,
+  Bot,
 } from "lucide-react";
 import { useHunterStore } from "../../stores/hunterStore.js";
 import { RANK_COLORS } from "../../lib/xpFormulas.js";
@@ -40,6 +41,7 @@ const NAV_ITEMS = [
   { to: "/brain", icon: Brain, label: "Second Brain" },
   { divider: true },
   { to: "/analytics", icon: BarChart3, label: "Analytics" },
+  { to: "/ai-coach", icon: Bot, label: "AI Hunter Coach" },
   { to: "/achievements", icon: Trophy, label: "Achievements" },
   { to: "/social", icon: Users, label: "Guild & Social" },
   { to: "/settings", icon: Settings, label: "Settings" },
