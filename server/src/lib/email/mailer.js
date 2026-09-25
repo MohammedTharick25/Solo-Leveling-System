@@ -1,126 +1,66 @@
-import net from "net";
-import tls from "tls";
 import config from "../../config/env.js";
 
-const waitForResponse = (socket) =>
-  new Promise((resolve, reject) => {
-    let buffer = "";
-    const onData = (chunk) => {
-      buffer += chunk.toString("utf8");
-      const lines = buffer.split(/\r?\n/);
-      if (lines.length < 2) return;
-      const complete = lines[lines.length - 2];
-      if (/^\d{3} /.test(complete)) {
-        cleanup();
-        resolve({ code: Number(complete.slice(0, 3)), text: buffer.trim() });
-      }
-    };
-    const onError = (err) => { cleanup(); reject(err); };
-    const cleanup = () => {
-      socket.off("data", onData);
-      socket.off("error", onError);
-    };
-    socket.on("data", onData);
-    socket.on("error", onError);
+const RESEND_API_URL = "https://api.resend.com/emails";
+
+const normalizeRecipient = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean).map(String);
+  return value ? [String(value)] : [];
+};
+
+const parseProviderError = (payload, status) => {
+  if (payload?.message) return payload.message;
+  if (payload?.error?.message) return payload.error.message;
+  if (payload?.name) return payload.name;
+  return `Email API request failed with status ${status}.`;
+};
+
+/**
+ * Sends transactional email through Resend's HTTPS API.
+ *
+ * This intentionally does not use SMTP. It works on hosting platforms where
+ * outbound SMTP ports are restricted because the provider is reached over
+ * normal HTTPS (443).
+ */
+export const sendEmail = async ({ to, subject, html, text }) => {
+  if (!config.RESEND_API_KEY) {
+    throw new Error("Email service is not configured. Set RESEND_API_KEY.");
+  }
+
+  const recipients = normalizeRecipient(to);
+  if (!recipients.length) {
+    throw new Error("Email recipient is required.");
+  }
+
+  if (!config.EMAIL_FROM) {
+    throw new Error("Email sender is not configured. Set EMAIL_FROM.");
+  }
+
+  const response = await fetch(RESEND_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: config.EMAIL_FROM,
+      to: recipients,
+      subject: String(subject || "Solo Leveling System"),
+      html: html || undefined,
+      text: text || undefined,
+    }),
   });
 
-const sendCommand = async (socket, command, expectedCodes) => {
-  socket.write(`${command}\r\n`);
-  const response = await waitForResponse(socket);
-  if (!expectedCodes.includes(response.code)) {
-    throw new Error(`SMTP ${response.code}: ${response.text}`);
-  }
-  return response;
-};
+  const payload = await response.json().catch(() => ({}));
 
-const connect = () => new Promise((resolve, reject) => {
-  const options = {
-    host: config.SMTP_HOST,
-    port: config.SMTP_PORT,
-    ...(config.SMTP_SECURE ? { servername: config.SMTP_HOST } : {}),
-  };
-  const socket = config.SMTP_SECURE ? tls.connect(options) : net.connect(options);
-  socket.once("connect", () => resolve(socket));
-  socket.once("secureConnect", () => resolve(socket));
-  socket.once("error", reject);
-});
-
-const escapeHeader = (value) => String(value).replace(/[\r\n]/g, " ");
-const encodeSubject = (subject) => `=?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`;
-
-export const sendEmail = async ({ to, subject, html, text }) => {
-  if (!config.SMTP_HOST || !config.SMTP_USER || !config.SMTP_PASS) {
-    throw new Error("Email service is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS.");
+  if (!response.ok) {
+    const providerMessage = parseProviderError(payload, response.status);
+    const error = new Error(`Email API error: ${providerMessage}`);
+    error.statusCode = response.status;
+    error.provider = "resend";
+    throw error;
   }
 
-  const socket = await connect();
-  socket.setTimeout(15000);
-
-  try {
-    const greeting = await waitForResponse(socket);
-    if (greeting.code !== 220) throw new Error(`SMTP ${greeting.code}: ${greeting.text}`);
-
-    await sendCommand(socket, `EHLO ${escapeHeader(config.SMTP_HOST)}`, [250]);
-
-    if (!config.SMTP_SECURE) {
-      await sendCommand(socket, "STARTTLS", [220]);
-      const secureSocket = tls.connect({ socket, servername: config.SMTP_HOST });
-      await new Promise((resolve, reject) => {
-        secureSocket.once("secureConnect", resolve);
-        secureSocket.once("error", reject);
-      });
-      await sendCommand(secureSocket, `EHLO ${escapeHeader(config.SMTP_HOST)}`, [250]);
-      await sendCommand(secureSocket, "AUTH LOGIN", [334]);
-      await sendCommand(secureSocket, Buffer.from(config.SMTP_USER).toString("base64"), [334]);
-      await sendCommand(secureSocket, Buffer.from(config.SMTP_PASS).toString("base64"), [235]);
-      await sendCommand(secureSocket, `MAIL FROM:<${escapeHeader(config.SMTP_USER)}>`, [250]);
-      await sendCommand(secureSocket, `RCPT TO:<${escapeHeader(to)}>`, [250, 251]);
-      await sendCommand(secureSocket, "DATA", [354]);
-      secureSocket.write(buildMessage({ to, subject, html, text }));
-      secureSocket.write("\r\n.\r\n");
-      await waitForResponse(secureSocket);
-      await sendCommand(secureSocket, "QUIT", [221]);
-      secureSocket.end();
-      return;
-    }
-
-    await sendCommand(socket, "AUTH LOGIN", [334]);
-    await sendCommand(socket, Buffer.from(config.SMTP_USER).toString("base64"), [334]);
-    await sendCommand(socket, Buffer.from(config.SMTP_PASS).toString("base64"), [235]);
-    await sendCommand(socket, `MAIL FROM:<${escapeHeader(config.SMTP_USER)}>`, [250]);
-    await sendCommand(socket, `RCPT TO:<${escapeHeader(to)}>`, [250, 251]);
-    await sendCommand(socket, "DATA", [354]);
-    socket.write(buildMessage({ to, subject, html, text }));
-    socket.write("\r\n.\r\n");
-    await waitForResponse(socket);
-    await sendCommand(socket, "QUIT", [221]);
-  } finally {
-    socket.destroy();
-  }
+  return payload;
 };
 
-const buildMessage = ({ to, subject, html, text }) => {
-  const boundary = `----=_SoloLeveling_${Date.now().toString(36)}`;
-  const body = [
-    `From: ${escapeHeader(config.EMAIL_FROM)}`,
-    `To: ${escapeHeader(to)}`,
-    `Subject: ${encodeSubject(subject)}`,
-    "MIME-Version: 1.0",
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    "",
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: 8bit",
-    "",
-    text,
-    `--${boundary}`,
-    'Content-Type: text/html; charset="UTF-8"',
-    "Content-Transfer-Encoding: 8bit",
-    "",
-    html,
-    `--${boundary}--`,
-  ].join("\r\n");
-
-  // SMTP requires lines beginning with a dot to be dot-stuffed.
-  return body.replace(/^\./gm, "..");
-};
+export const isEmailConfigured = () => Boolean(config.RESEND_API_KEY && config.EMAIL_FROM);

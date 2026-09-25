@@ -26,13 +26,10 @@ const config = {
 
   BCRYPT_ROUNDS: 12,
 
-  SMTP_HOST: process.env.SMTP_HOST,
-  SMTP_PORT: parseInt(process.env.SMTP_PORT, 10) || 587,
-  SMTP_SECURE:
-    String(process.env.SMTP_SECURE || "false").toLowerCase() === "true",
-  SMTP_USER: process.env.SMTP_USER,
-  SMTP_PASS: process.env.SMTP_PASS,
-  EMAIL_FROM: process.env.EMAIL_FROM || "Solo Leveling <no-reply@localhost>",
+  // Transactional email is sent through Resend's HTTPS API instead of SMTP.
+  // This is compatible with hosting platforms that restrict outbound SMTP ports.
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  EMAIL_FROM: process.env.EMAIL_FROM,
   PASSWORD_RESET_EXPIRY_MINUTES:
     parseInt(process.env.PASSWORD_RESET_EXPIRY_MINUTES, 10) || 30,
 
