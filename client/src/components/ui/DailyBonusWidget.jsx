@@ -24,25 +24,10 @@ export default function DailyBonusWidget() {
   // the "hunter" query.
   const { hunter, setHunter, setStats } = useHunterStore();
 
-  // Also check server-side on mount in case localStorage was cleared
-  useQuery({
-    queryKey: ["daily-bonus-status"],
-    queryFn: async () => {
-      const { data } = await api.post("/auth/daily-bonus");
-      return data.data;
-    },
-    enabled: visible && !claimed,
-    onSuccess: (res) => {
-      if (res.alreadyClaimed) {
-        // Server says already claimed — mark locally and hide
-        markClaimedToday();
-        setVisible(false);
-      }
-    },
-    retry: false,
-    // Don't auto-claim on mount check — we use a separate claim button
-    // This just checks status. We'll actually use the mutation for claiming.
-  });
+  const streak = hunter?.currentStreak || 0;
+  const streakBonusPreview = Math.min(Math.floor(streak / 7) * 10, 100);
+  const baseReward = 25;
+  const rewardPreview = baseReward + streakBonusPreview;
 
   const claimMutation = useMutation({
     mutationFn: () => api.post("/auth/daily-bonus"),
@@ -102,69 +87,37 @@ export default function DailyBonusWidget() {
         </button>
 
         {!claimed ? (
-          <div className="flex items-center gap-4">
-            <div
-              className="w-12 h-12 rounded-xl bg-cyan-500/20 border border-cyan-500/40
-                            flex items-center justify-center shrink-0 animate-float"
-            >
-              <Gift size={22} className="text-cyan-400" />
+          <div className="relative grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+            <div className="relative mx-auto grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 sm:mx-0">
+              <div className="absolute inset-0 rounded-2xl bg-cyan-400/10 blur-xl" />
+              <Gift size={24} className="relative text-cyan-300" />
             </div>
-            <div className="flex-1">
-              <p className="text-system mb-0.5">System Reward</p>
-              <p className="font-heading font-bold text-base text-slate-100">
-                Daily Login Bonus
-              </p>
-              <p className="font-body text-xs text-slate-400 mt-0.5">
-                {hunter?.currentStreak > 0
-                  ? `${hunter.currentStreak}-day streak bonus available`
-                  : "Claim your daily XP reward"}
-              </p>
+            <div className="min-w-0 text-center sm:text-left">
+              <div className="mb-1 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                <p className="text-system">System Reward</p>
+                <span className="rounded-full border border-yellow-400/20 bg-yellow-400/5 px-2 py-0.5 font-display text-[9px] tracking-wider text-yellow-300">DAILY DROP</span>
+              </div>
+              <p className="font-heading text-base font-bold text-slate-100">Daily Login Bonus</p>
+              <p className="mt-1 text-xs text-slate-400">Your reward is shown before you claim it.</p>
+              <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/15 bg-cyan-400/5 px-2.5 py-1.5 font-display text-[11px] text-cyan-300"><Zap size={11} /> +{baseReward} XP base</span>
+                {streakBonusPreview > 0 ? <span className="inline-flex items-center gap-1.5 rounded-lg border border-purple-400/15 bg-purple-400/5 px-2.5 py-1.5 font-display text-[11px] text-purple-300">🔥 +{streakBonusPreview} streak</span> : <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-950/40 px-2.5 py-1.5 text-[10px] text-slate-500">🔥 Streak bonus unlocks every 7 days</span>}
+                <span className="inline-flex items-center rounded-lg border border-yellow-400/15 bg-yellow-400/5 px-2.5 py-1.5 font-display text-[11px] font-bold text-yellow-300">= +{rewardPreview} XP</span>
+              </div>
             </div>
-            <button
-              onClick={() => claimMutation.mutate()}
-              disabled={claimMutation.isPending}
-              className="btn-primary py-2 px-4 text-sm shrink-0 flex items-center gap-2"
-            >
-              {claimMutation.isPending ? (
-                <span className="w-4 h-4 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
-              ) : (
-                <>
-                  <Gift size={14} /> Claim
-                </>
-              )}
+            <button onClick={() => claimMutation.mutate()} disabled={claimMutation.isPending} className="btn-primary flex w-full items-center justify-center gap-2 py-2.5 text-sm sm:w-auto">
+              {claimMutation.isPending ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-400/30 border-t-cyan-400" /> : <><Gift size={14} /> Claim Reward</>}
             </button>
           </div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex items-center gap-4"
-          >
-            <div
-              className="w-12 h-12 rounded-xl bg-yellow-500/20 border border-yellow-500/40
-                            flex items-center justify-center shrink-0"
-            >
-              <Zap size={22} className="text-yellow-400" />
+          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-yellow-500/40 bg-yellow-500/10"><Zap size={22} className="text-yellow-300" /></div>
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-[10px] tracking-[0.2em] text-yellow-300">BONUS CLAIMED</p>
+              <p className="mt-0.5 font-heading text-xl font-black text-slate-100">+{result?.xpEarned || 0} XP acquired</p>
+              <p className="mt-1 text-xs text-slate-400">{result?.streakBonus > 0 ? `Includes +${result.streakBonus} XP streak bonus.` : "Base daily reward secured. Return tomorrow for another drop."}</p>
             </div>
-            <div className="flex-1">
-              <p className="font-display text-xs text-yellow-400 tracking-widest mb-1">
-                BONUS CLAIMED
-              </p>
-              <p className="font-heading font-bold text-xl text-slate-100">
-                +{result?.xpEarned} XP
-              </p>
-              {result?.streakBonus > 0 && (
-                <p className="font-body text-xs text-slate-400 mt-0.5">
-                  Includes +{result.streakBonus} XP streak bonus
-                </p>
-              )}
-            </div>
-            <button
-              onClick={() => setVisible(false)}
-              className="btn-ghost py-2 px-3 text-sm"
-            >
-              Close
-            </button>
+            <button onClick={() => setVisible(false)} className="btn-ghost self-start sm:self-auto">Close</button>
           </motion.div>
         )}
       </motion.div>

@@ -128,6 +128,7 @@ export default function BrainPage() {
 
   return (
     <motion.div
+      className="min-w-0 max-w-full overflow-hidden"
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -147,7 +148,7 @@ export default function BrainPage() {
       </div>
 
       {/* Main tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="mb-6 flex max-w-full gap-2 overflow-x-auto pb-1 no-scrollbar">
         {[
           { id: "notes", label: "📝 Notes" },
           { id: "graph", label: "🕸️ Knowledge Graph" },
@@ -166,8 +167,7 @@ export default function BrainPage() {
       {/* Knowledge Graph tab */}
       {mainTab === "graph" && (
         <div
-          className="glass rounded-2xl overflow-hidden border border-slate-700/50"
-          style={{ height: "520px" }}
+          className="glass h-[360px] overflow-hidden rounded-2xl border border-slate-700/50 sm:h-[460px] lg:h-[520px]"
         >
           <KnowledgeGraph
             onNodeClick={(node) => {
@@ -238,7 +238,7 @@ export default function BrainPage() {
           {/* Notes grid */}
           <motion.div variants={staggerItem}>
             {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {[...Array(6)].map((_, i) => (
                   <div key={i} className="skeleton h-40 rounded-xl" />
                 ))}
@@ -258,7 +258,7 @@ export default function BrainPage() {
                 }
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {notes.map((note) => (
                   <NoteCard
                     key={note._id}
@@ -300,7 +300,7 @@ export default function BrainPage() {
           })}
           className="space-y-4"
         >
-          <div className="flex gap-3">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row">
             <div className="flex-1">
               <Input
                 label="Title"
@@ -382,7 +382,7 @@ export default function BrainPage() {
                 </span>
               ))}
             </div>
-            <p className="font-body text-sm text-slate-300 whitespace-pre-wrap leading-relaxed mb-5">
+            <p className="scroll-user-content break-user-content mb-5 max-w-full max-h-[55vh] sm:max-h-[60vh] pr-2 font-body text-sm leading-relaxed text-slate-300">
               {viewNote.content || "No content."}
             </p>
             {viewNote.sourceUrl && (
@@ -436,7 +436,7 @@ function NoteCard({ note, onClick, onFav }) {
       variants={staggerItem}
       whileHover={{ y: -3 }}
       onClick={onClick}
-      className={`glass rounded-xl p-5 cursor-pointer border ${TYPE_COLORS[note.type] || "border-slate-700/50"} hover:border-opacity-60 transition-all duration-200`}
+      className={`glass min-w-0 overflow-hidden rounded-xl p-5 cursor-pointer border ${TYPE_COLORS[note.type] || "border-slate-700/50"} hover:border-opacity-60 transition-all duration-200`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2">
@@ -459,7 +459,7 @@ function NoteCard({ note, onClick, onFav }) {
         {note.title}
       </h4>
       {note.content && (
-        <p className="font-body text-xs text-slate-500 line-clamp-3 leading-relaxed mb-3">
+        <p className="font-body text-xs text-slate-500 line-clamp-3 leading-relaxed mb-3 break-words [overflow-wrap:anywhere]">
           {note.content}
         </p>
       )}

@@ -57,7 +57,7 @@ export const parseDeviceInfo = (userAgent = "") => {
   } else if (/iPad/i.test(ua)) {
     model = "iPad";
   } else if (/Windows/i.test(ua)) {
-    model = "Windows PC";
+    model = "Windows";
   } else if (/Macintosh|Mac OS X/i.test(ua)) {
     model = "Mac";
   } else if (/Linux/i.test(ua)) {

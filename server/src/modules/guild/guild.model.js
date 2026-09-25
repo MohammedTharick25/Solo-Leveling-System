@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const guildChallengeSchema = new mongoose.Schema(
   {
     title: String,
-    description: String,
+    description: { type: String, trim: true, maxlength: 500 },
     xpReward: Number,
     firstCompleterBonus: { type: Number, default: 50 },
     firstCompleterId: {
@@ -25,7 +25,7 @@ const guildChallengeSchema = new mongoose.Schema(
 const guildSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, unique: true, trim: true },
-    description: String,
+    description: { type: String, trim: true, maxlength: 500 },
     tag: { type: String, maxlength: 5, uppercase: true },
     leaderId: {
       type: mongoose.Schema.Types.ObjectId,

@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   Clock,
   Star,
+  Zap as ZapIcon,
+  Activity as ActivityIcon,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import api from "../../lib/api.js";
@@ -80,7 +82,12 @@ export default function SocialPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (body) => api.post("/guilds", body),
+    mutationFn: (body) => {
+      const description = body.description?.trim() || "";
+      const words = description ? description.split(/\s+/) : [];
+      if (words.length > 30) throw new Error("Guild description can contain up to 30 words.");
+      return api.post("/guilds", { ...body, description: words.join(" ") });
+    },
     onSuccess: () => {
       setCreateModal(false);
       reset();
@@ -140,7 +147,7 @@ export default function SocialPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 flex-wrap">
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
         {[
           { id: "guild", label: "🏰 Guild" },
           { id: "challenges", label: "⚔️ Challenges" },
@@ -150,7 +157,7 @@ export default function SocialPage() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-heading text-sm font-semibold border transition-all
+            className={`group flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 font-heading text-xs sm:text-sm font-semibold transition-all duration-200
                         ${tab === t.id ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-400" : "border-slate-800 text-slate-500 hover:text-slate-300"}`}
           >
             {t.label}
@@ -193,80 +200,88 @@ export default function SocialPage() {
               />
             ) : (
               <div className="space-y-6">
-                {/* Guild card */}
-                <div className="glass-cyan rounded-2xl p-6 relative overflow-hidden">
-                  <div className="absolute -top-16 -right-16 w-48 h-48 bg-cyan-500/8 rounded-full blur-3xl" />
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        {myGuild.tag && (
-                          <span className="font-display text-xs text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 rounded">
-                            [{myGuild.tag}]
-                          </span>
-                        )}
-                        <h2 className="font-heading font-bold text-xl text-slate-100">
-                          {myGuild.name}
-                        </h2>
+                {/* Guild identity / command center */}
+                <motion.div
+                  whileHover={{ y: -2 }}
+                  className="relative overflow-hidden rounded-3xl border border-cyan-400/20 bg-gradient-to-br from-cyan-500/[0.10] via-slate-900/90 to-purple-500/[0.08] p-5 sm:p-7 shadow-[0_20px_80px_rgba(8,145,178,0.08)]"
+                >
+                  <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
+                  <div className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-purple-500/10 blur-3xl" />
+                  <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-4">
+                        <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1 font-display text-[10px] tracking-[0.2em] text-cyan-300">
+                          GUILD COMMAND CENTER
+                        </span>
                         {isLeader && <Badge color="yellow">Leader</Badge>}
                       </div>
-                      {myGuild.description && (
-                        <p className="font-body text-sm text-slate-400 mb-4">
-                          {myGuild.description}
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-6">
-                        <StatPill
-                          label="Members"
-                          value={`${myGuild.members?.length}/${myGuild.maxMembers}`}
-                        />
-                        <StatPill
-                          label="Total XP"
-                          value={(myGuild.totalXP || 0).toLocaleString()}
-                          color="text-cyan-400"
-                        />
-                        <StatPill
-                          label="Weekly XP"
-                          value={(myGuild.weeklyXP || 0).toLocaleString()}
-                          color="text-purple-400"
-                        />
-                        <StatPill
-                          label="Level"
-                          value={myGuild.level || 1}
-                          color="text-yellow-400"
-                        />
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="relative grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-cyan-300/30 bg-slate-950/80 shadow-[0_0_35px_rgba(34,211,238,0.12)]">
+                          <div className="absolute inset-1 rounded-xl border border-cyan-400/10" />
+                          <Crown size={27} className="text-cyan-300" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {myGuild.tag && (
+                              <span className="font-display text-xs text-cyan-300">[{myGuild.tag}]</span>
+                            )}
+                            <h2 className="truncate font-heading text-2xl sm:text-3xl font-black text-slate-50">
+                              {myGuild.name}
+                            </h2>
+                          </div>
+                          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
+                            {myGuild.description || "A coordinated squad focused on consistent progression and shared victories."}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+
+                    <div className="flex flex-wrap gap-2 lg:max-w-xs lg:justify-end">
                       {isLeader && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => setChallengeModal(true)}
-                        >
-                          <Plus size={13} /> Challenge
+                        <Button size="sm" variant="secondary" onClick={() => setChallengeModal(true)}>
+                          <Plus size={13} /> Launch Challenge
                         </Button>
                       )}
                       <button
                         onClick={() => leaveMutation.mutate(myGuild._id)}
-                        className="p-2 text-slate-600 hover:text-red-400 transition-colors rounded-lg"
-                        title="Leave guild"
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-700/70 bg-slate-950/40 px-3 py-2 font-heading text-xs text-slate-500 transition hover:border-red-500/30 hover:bg-red-500/5 hover:text-red-300"
                       >
-                        <LogOut size={16} />
+                        <LogOut size={14} /> Leave
                       </button>
                     </div>
                   </div>
 
-                  {myGuild.announcement && (
-                    <div className="mt-4 p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
-                      <p className="font-heading text-xs text-cyan-400 mb-0.5">
-                        📢 Announcement
-                      </p>
-                      <p className="font-body text-sm text-slate-300">
-                        {myGuild.announcement}
-                      </p>
+                  <div className="relative mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <GuildMetric icon={Users} label="Roster" value={`${memberCount}/${myGuild.maxMembers}`} />
+                    <GuildMetric icon={ZapIcon} label="Total XP" value={(myGuild.totalXP || 0).toLocaleString()} accent="cyan" />
+                    <GuildMetric icon={ActivityIcon} label="This Week" value={(myGuild.weeklyXP || 0).toLocaleString()} accent="purple" />
+                    <GuildMetric icon={Trophy} label="Guild Level" value={myGuild.level || 1} accent="yellow" />
+                  </div>
+
+                  <div className="relative mt-4 rounded-2xl border border-white/5 bg-slate-950/35 p-4">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <span className="font-heading text-[11px] uppercase tracking-[0.16em] text-slate-500">Guild activity</span>
+                      <span className="font-display text-xs text-cyan-300">{memberCount} active slots</span>
                     </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                      <motion.div
+                        initial={{ width: 0 }} animate={{ width: `${Math.min(100, (memberCount / Math.max(1, myGuild.maxMembers || 1)) * 100)}%` }}
+                        transition={{ duration: 0.8 }}
+                        className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-cyan-300 to-purple-400"
+                      />
+                    </div>
+                  </div>
+
+                  {myGuild.announcement && (
+                    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="relative mt-4 flex gap-3 rounded-2xl border border-cyan-400/15 bg-cyan-400/5 p-4">
+                      <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-cyan-400/10 text-sm">📢</div>
+                      <div className="min-w-0">
+                        <p className="font-heading text-[10px] uppercase tracking-[0.18em] text-cyan-300">Guild announcement</p>
+                        <p className="mt-1 break-words text-sm leading-relaxed text-slate-300">{myGuild.announcement}</p>
+                      </div>
+                    </motion.div>
                   )}
-                </div>
+                </motion.div>
 
                 {/* Members */}
                 <div className="glass rounded-2xl p-6 border border-slate-700/50">
@@ -489,9 +504,15 @@ export default function SocialPage() {
             <textarea
               rows={3}
               className="input resize-none"
-              placeholder="Guild purpose and mission…"
-              {...register("description")}
+              placeholder="Describe your guild in 30 words or less…"
+              {...register("description", {
+                validate: (value) => {
+                  const words = value?.trim() ? value.trim().split(/\s+/).length : 0;
+                  return words <= 30 || "Description can contain up to 30 words.";
+                },
+              })}
             />
+            <p className="mt-1 text-[10px] text-slate-600">Keep it sharp: maximum 30 words.</p>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <Button
@@ -849,6 +870,16 @@ function GuildMemberLeaderboard({ members, currentUserId }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function GuildMetric({ icon: Icon, label, value, accent = "slate" }) {
+  const tone = { cyan: "text-cyan-300", purple: "text-purple-300", yellow: "text-yellow-300", slate: "text-slate-200" }[accent] || "text-slate-200";
+  return (
+    <div className="rounded-2xl border border-white/5 bg-slate-950/35 p-3 sm:p-4 transition hover:border-cyan-400/15 hover:bg-slate-950/50">
+      <div className="mb-2 flex items-center gap-2 text-slate-500"><Icon size={13} /><span className="font-heading text-[10px] uppercase tracking-wider">{label}</span></div>
+      <p className={`font-display text-lg sm:text-xl font-bold ${tone}`}>{value}</p>
     </div>
   );
 }

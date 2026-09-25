@@ -9,13 +9,19 @@ export const createGuild = async (
   const hunter = await Hunter.findOne({ userId });
   if (!hunter) throw new AppError("Hunter not found.", 404);
 
+  const normalizedDescription = String(description || "").trim();
+  const descriptionWords = normalizedDescription ? normalizedDescription.split(/\s+/) : [];
+  if (descriptionWords.length > 30) {
+    throw new AppError("Guild description can contain up to 30 words.", 400);
+  }
+
   const existingGuild = await GuildRepository.findByMemberUserId(userId);
   if (existingGuild)
     throw new AppError("You are already in a guild. Leave it first.", 409);
 
   const guild = await GuildRepository.create({
     name,
-    description,
+    description: descriptionWords.join(" "),
     tag: tag?.toUpperCase(),
     leaderId: userId,
     isPublic: isPublic !== false,

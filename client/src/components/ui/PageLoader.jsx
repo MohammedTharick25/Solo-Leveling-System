@@ -111,7 +111,7 @@ export function Modal({
           initial="initial"
           animate="animate"
           exit="exit"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm"
           onClick={onClose}
         >
           <motion.div
@@ -119,7 +119,7 @@ export function Modal({
             initial="initial"
             animate="animate"
             exit="exit"
-            className={`w-full ${maxWidth} glass border border-slate-700/50 rounded-2xl shadow-card`}
+            className={`w-full ${maxWidth} max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] glass border border-slate-700/50 rounded-2xl shadow-card overflow-hidden flex flex-col`}
             onClick={(e) => e.stopPropagation()}
           >
             {title && (
@@ -135,7 +135,7 @@ export function Modal({
                 </button>
               </div>
             )}
-            <div className="p-6">{children}</div>
+            <div className="p-4 sm:p-6 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain break-words">{children}</div>
           </motion.div>
         </motion.div>
       )}

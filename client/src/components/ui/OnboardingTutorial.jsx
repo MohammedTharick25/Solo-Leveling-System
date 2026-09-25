@@ -1,49 +1,76 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronRight, ChevronLeft, Zap } from "lucide-react";
+import {
+  X,
+  ChevronRight,
+  ChevronLeft,
+  Zap,
+  Check,
+  Compass,
+  Sparkles,
+  Target,
+  Brain,
+  Users,
+  BookOpen,
+  ArrowUpRight,
+} from "lucide-react";
 
 const STEPS = [
   {
-    title: "Welcome to The System",
-    description:
-      "You have been chosen. This platform tracks your growth, assigns daily quests, and transforms real habits into a leveling experience. Complete the tour to understand how The System works.",
+    title: "Initialize your System",
+    description: "Your dashboard is a personal command center. Follow quests, habits, focus sessions and progression from one place without losing your next action.",
     emoji: "⚡",
+    accent: "SYSTEM",
+    icon: Compass,
+    tips: ["Start with one small action", "Use the sidebar to explore", "Your progress is saved automatically"],
   },
   {
-    title: "Daily Quests",
-    description:
-      "Every day The System assigns exactly 5 quests targeting your weakest stats. Complete ALL 5 before midnight to maintain your streak. Miss them and your streak resets with an XP penalty.",
-    emoji: "📜",
+    title: "Turn actions into XP",
+    description: "Quests and habits convert real-world effort into XP. Complete the next visible task, watch the progress update, then choose your next move.",
+    emoji: "🎯",
+    accent: "PROGRESSION",
+    icon: Target,
+    tips: ["Complete today's quests", "Build habit streaks", "Watch your level progress"],
   },
   {
-    title: "Habit Tracker",
-    description:
-      'Habits are recurring daily actions that build your life stats over time. Create habits like "Read 20 pages" or "Morning workout". Complete them daily to build long streaks and earn XP.',
-    emoji: "✅",
+    title: "Build your daily protocol",
+    description: "Habits are your repeatable system. Create routines, choose a frequency, earn XP and protect your streak. The goal is consistency, not perfection.",
+    emoji: "🔥",
+    accent: "HABITS",
+    icon: Check,
+    tips: ["Keep habits realistic", "Use streaks as motivation", "Missed a day? Restart immediately"],
   },
   {
-    title: "Focus Mode",
-    description:
-      "Use Pomodoro or Deep Work sessions to earn XP while you work. Link a focus session to a quest and it will automatically update your quest progress when the session ends.",
+    title: "Focus without friction",
+    description: "Use Pomodoro or Deep Work when you need momentum. Start a session, work until the timer ends, and let the System record the result.",
     emoji: "⏱️",
+    accent: "FOCUS",
+    icon: Zap,
+    tips: ["Pick one task before starting", "Silence distractions", "Finish the session before switching"],
   },
   {
-    title: "Task Raids",
-    description:
-      "Task Raids are real-world tasks — assignments, projects, meetings. Set a difficulty level and complete them to earn XP. Harder tasks give more XP and stat bonuses.",
-    emoji: "⚔️",
+    title: "Your Second Brain",
+    description: "Capture ideas, notes and useful knowledge before they disappear. Search, favorite and revisit information from a single responsive workspace.",
+    emoji: "🧠",
+    accent: "KNOWLEDGE",
+    icon: Brain,
+    tips: ["Capture ideas quickly", "Add tags for retrieval", "Open long notes safely on mobile"],
   },
   {
-    title: "Shadow Army",
-    description:
-      "As you progress, you unlock Shadows representing mastered disciplines. Each Shadow evolves through 4 stages: Initiate → Elite → Commander → Monarch. Unlock all 12 to become Shadow Monarch.",
-    emoji: "👁️",
+    title: "Enter the Guild",
+    description: "Social progression gives your effort a shared purpose. Join a guild, contribute XP, complete guild challenges and keep your team moving.",
+    emoji: "🏰",
+    accent: "SOCIAL",
+    icon: Users,
+    tips: ["Find a guild that fits your goals", "Contribute regularly", "Use challenges for team momentum"],
   },
   {
-    title: "The System is Ready",
-    description:
-      "Your journey begins now. Complete your 5 daily quests, maintain your streak, and watch your stats climb. The System is always watching. Do not disappoint it.",
+    title: "You are ready",
+    description: "You never need to know everything before starting. If you feel stuck, return to the next clear action, use the guidance on each screen, and keep moving.",
     emoji: "🌑",
+    accent: "AWAKEN",
+    icon: Sparkles,
+    tips: ["Do one thing now", "Explore at your own pace", "Come back whenever you need direction"],
   },
 ];
 
@@ -55,20 +82,33 @@ export default function OnboardingTutorial() {
 
   useEffect(() => {
     if (!localStorage.getItem(TOUR_KEY)) {
-      setTimeout(() => setVisible(true), 1000);
+      const timer = setTimeout(() => setVisible(true), 700);
+      return () => clearTimeout(timer);
     }
   }, []);
+
+  useEffect(() => {
+    if (!visible) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") dismiss();
+      if (event.key === "ArrowRight") next();
+      if (event.key === "ArrowLeft") prev();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   const dismiss = () => {
     localStorage.setItem(TOUR_KEY, "true");
     setVisible(false);
   };
-  const next = () =>
-    step < STEPS.length - 1 ? setStep((s) => s + 1) : dismiss();
+  const next = () => (step < STEPS.length - 1 ? setStep((s) => s + 1) : dismiss());
   const prev = () => step > 0 && setStep((s) => s - 1);
 
   if (!visible) return null;
   const current = STEPS[step];
+  const Icon = current.icon;
+  const progress = ((step + 1) / STEPS.length) * 100;
 
   return (
     <AnimatePresence>
@@ -76,79 +116,81 @@ export default function OnboardingTutorial() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 flex items-center justify-center p-4"
-        style={{
-          zIndex: 99997,
-          background: "rgba(2,6,23,0.88)",
-          backdropFilter: "blur(6px)",
-        }}
+        className="fixed inset-0 flex items-center justify-center p-3 sm:p-6"
+        style={{ zIndex: 99997, background: "rgba(2,6,23,0.92)", backdropFilter: "blur(12px)" }}
       >
         <motion.div
-          key={step}
-          initial={{ opacity: 0, scale: 0.93, y: 20 }}
+          initial={{ opacity: 0, scale: 0.94, y: 24 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: -10 }}
-          transition={{ type: "spring", stiffness: 280, damping: 26 }}
-          className="relative w-full max-w-md glass-cyan rounded-3xl p-8 shadow-[0_20px_60px_rgba(0,0,0,0.8)]"
+          className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto glass-cyan rounded-[28px] border border-cyan-500/20 shadow-[0_30px_100px_rgba(0,0,0,0.85)]"
         >
-          <button
-            onClick={dismiss}
-            className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/60 transition-all"
-          >
-            <X size={16} />
+          <button onClick={dismiss} aria-label="Close tutorial" className="absolute top-4 right-4 z-10 p-2 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800/70 transition-all">
+            <X size={17} />
           </button>
 
-          {/* Step bar */}
-          <div className="flex gap-1.5 mb-6">
-            {STEPS.map((_, i) => (
-              <div
-                key={i}
-                className={`h-1 rounded-full transition-all duration-300 ${i === step ? "bg-cyan-400 flex-[2]" : i < step ? "bg-cyan-700 flex-1" : "bg-slate-700 flex-1"}`}
-              />
-            ))}
-          </div>
+          <div className="p-5 sm:p-8 md:p-10">
+            <div className="flex items-center justify-between gap-4 mb-5 pr-10">
+              <div>
+                <p className="text-system">System onboarding</p>
+                <p className="text-[11px] text-slate-600 mt-1">Use ← → to navigate · Esc to exit</p>
+              </div>
+              <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
+                <span>{step + 1}</span><span>/</span><span>{STEPS.length}</span>
+              </div>
+            </div>
 
-          <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-5 text-4xl">
-            {current.emoji}
-          </div>
-          <p className="text-system mb-2">
-            Step {step + 1} of {STEPS.length}
-          </p>
-          <h2 className="font-heading font-black text-2xl text-slate-100 mb-3 leading-snug">
-            {current.title}
-          </h2>
-          <p className="font-body text-sm text-slate-400 leading-relaxed mb-8">
-            {current.description}
-          </p>
+            <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden mb-8">
+              <motion.div animate={{ width: `${progress}%` }} className="h-full rounded-full bg-cyan-400" />
+            </div>
 
-          <div className="flex items-center justify-between">
-            <button
-              onClick={prev}
-              disabled={step === 0}
-              className="btn-ghost flex items-center gap-1 disabled:opacity-30"
-            >
-              <ChevronLeft size={15} /> Back
-            </button>
-            <button
-              onClick={dismiss}
-              className="font-body text-xs text-slate-600 hover:text-slate-400 transition-colors"
-            >
-              Skip tour
-            </button>
-            <button
-              onClick={next}
-              className="btn-primary flex items-center gap-1"
-            >
-              {step === STEPS.length - 1 ? (
-                <>
-                  <Zap size={14} /> Begin Hunt
-                </>
-              ) : (
-                <>
-                  Next <ChevronRight size={15} />
-                </>
-              )}
-            </button>
+            <div className="grid md:grid-cols-[0.85fr_1.15fr] gap-7 md:gap-10 items-center">
+              <motion.div
+                key={`visual-${step}`}
+                initial={{ opacity: 0, scale: 0.9, rotate: -3 }}
+                animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                className="relative min-h-[210px] sm:min-h-[250px] rounded-3xl border border-cyan-500/20 bg-slate-950/70 overflow-hidden flex items-center justify-center"
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.12),transparent_55%)]" />
+                <div className="relative text-center">
+                  <div className="mx-auto w-24 h-24 sm:w-28 sm:h-28 rounded-[28px] bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center text-5xl sm:text-6xl shadow-[0_0_45px_rgba(34,211,238,0.12)]">
+                    {current.emoji}
+                  </div>
+                  <div className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/5 text-cyan-400 text-[10px] uppercase tracking-[0.18em]">
+                    <Icon size={12} /> {current.accent}
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}>
+                <p className="text-cyan-400 text-[10px] uppercase tracking-[0.2em] mb-2">Step {step + 1} · {current.accent}</p>
+                <h2 className="font-heading font-black text-2xl sm:text-3xl text-slate-100 mb-3 leading-tight">{current.title}</h2>
+                <p className="font-body text-sm text-slate-400 leading-7 mb-6">{current.description}</p>
+
+                <div className="space-y-2.5">
+                  {current.tips.map((tip) => (
+                    <div key={tip} className="flex items-center gap-3 rounded-xl border border-slate-800/80 bg-slate-900/50 px-3 py-2.5">
+                      <span className="w-6 h-6 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center shrink-0"><Check size={13} /></span>
+                      <span className="text-xs text-slate-300">{tip}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+
+            <div className="mt-8 pt-5 border-t border-slate-800/70 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex gap-1.5">
+                {STEPS.map((_, i) => (
+                  <button key={i} onClick={() => setStep(i)} aria-label={`Go to step ${i + 1}`} className={`h-1.5 rounded-full transition-all ${i === step ? "w-7 bg-cyan-400" : i < step ? "w-3 bg-cyan-700" : "w-3 bg-slate-700 hover:bg-slate-600"}`} />
+                ))}
+              </div>
+              <div className="flex items-center justify-between sm:justify-end gap-2">
+                <button onClick={prev} disabled={step === 0} className="btn-ghost flex items-center gap-1 disabled:opacity-25"><ChevronLeft size={15} /> Back</button>
+                <button onClick={dismiss} className="font-body text-xs text-slate-600 hover:text-slate-300 px-3 py-2 transition-colors">Skip</button>
+                <button onClick={next} className="btn-primary flex items-center gap-1.5 min-w-[112px] justify-center">
+                  {step === STEPS.length - 1 ? <><ArrowUpRight size={14} /> Enter System</> : <>Continue <ChevronRight size={15} /></>}
+                </button>
+              </div>
+            </div>
           </div>
         </motion.div>
       </motion.div>
