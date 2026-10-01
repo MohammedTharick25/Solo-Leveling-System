@@ -62,6 +62,5 @@ hunterSchema.set('toJSON', { virtuals: true });
 hunterSchema.set('toObject', { virtuals: true });
 
 hunterSchema.index({ totalXP: -1 });
-hunterSchema.index({ userId: 1 });
 
 export default mongoose.model('Hunter', hunterSchema);

@@ -4,6 +4,16 @@ export const errorHandler = (err, req, res, next) => {
   let statusCode = err.statusCode || 500;
   let message = err.message || "Internal Server Error";
 
+  if (req.originalUrl?.startsWith("/api/v1/billing")) {
+    const route = req.originalUrl.split("?")[0];
+    console.error(`[BILLING] ${req.method} ${route} failed (${statusCode})`, {
+      name: err.name,
+      code: err.code,
+      message: err.message,
+      stack: err.stack,
+    });
+  }
+
   // Mongoose validation error
   if (err.name === "ValidationError") {
     statusCode = 400;

@@ -48,6 +48,10 @@ const razorpayRequest = async (path, { method = "GET", body } = {}) => {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = payload?.error?.description || "Razorpay could not process the billing request.";
+    console.error(`[BILLING] Razorpay request failed (${response.status})`, {
+      code: payload?.error?.code,
+      message,
+    });
     throw new AppError(message, response.status >= 500 ? 502 : 400);
   }
   return payload;
@@ -182,7 +186,16 @@ export const createSubscription = async (userId, tier) => {
     currentPeriodEnd: null,
     cancelAtCycleEnd: false,
   };
-  await user.save({ validateBeforeSave: false });
+  try {
+    await user.save({ validateBeforeSave: false });
+  } catch (error) {
+    console.error("[BILLING] Razorpay subscription was created but its ID could not be saved to the user record", {
+      name: error.name,
+      code: error.code,
+      message: error.message,
+    });
+    throw error;
+  }
 
   return {
     subscriptionId: subscription.id,
