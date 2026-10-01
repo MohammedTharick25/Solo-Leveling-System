@@ -13,6 +13,8 @@ import {
   Star,
   Zap as ZapIcon,
   Activity as ActivityIcon,
+  ShieldCheck,
+  Medal,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import api from "../../lib/api.js";
@@ -32,6 +34,9 @@ import {
   StatBar,
 } from "../../components/ui/PageLoader.jsx";
 import { useHunterStore } from "../../stores/hunterStore.js";
+import GuildActivityHub from "./GuildActivityHub.jsx";
+
+const GUILD_CREATION_XP = 5000;
 
 export default function SocialPage() {
   const [tab, setTab] = useState("guild");
@@ -39,7 +44,10 @@ export default function SocialPage() {
   const [searchModal, setSearchModal] = useState(false);
   const [challengeModal, setChallengeModal] = useState(false);
   const queryClient = useQueryClient();
-  const { user } = useHunterStore();
+  const { user, hunter } = useHunterStore();
+  const totalXP = Number(hunter?.totalXP || 0);
+  const createXPRemaining = Math.max(0, GUILD_CREATION_XP - totalXP);
+  const canCreateGuild = createXPRemaining === 0;
   const { register, handleSubmit, reset } = useForm();
   const { register: regC, handleSubmit: hsC, reset: rsC } = useForm();
 
@@ -108,6 +116,19 @@ export default function SocialPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["my-guild"] }),
   });
 
+  const roleMutation = useMutation({
+    mutationFn: ({ memberId, role }) => api.patch(
+      `/guilds/${myGuildData?.guild?._id}/members/${memberId}/role`,
+      { role },
+    ),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["my-guild"] }),
+        queryClient.invalidateQueries({ queryKey: ["guild-members"] }),
+      ]);
+    },
+  });
+
   const addChallengeMutation = useMutation({
     mutationFn: (body) =>
       api.post(`/guilds/${myGuildData?.guild?._id}/challenges`, body),
@@ -123,6 +144,10 @@ export default function SocialPage() {
     myGuild?.leaderId === user?._id ||
     myGuild?.leaderId?._id === user?._id ||
     myGuild?.leaderId?.toString() === user?._id?.toString();
+  const myRole = myGuild?.members?.find((member) =>
+    String(member.userId?._id || member.userId) === String(user?._id),
+  )?.role;
+  const canManageChallenges = isLeader || myRole === "officer";
 
   // ── Defensive normalization of the leaderboard response ───────────────────
   // Backend shapes can drift (e.g. { entries, myPosition } vs a bare array,
@@ -131,6 +156,9 @@ export default function SocialPage() {
   const leaderboard = normalizeLeaderboard(leaderboardData);
 
   const memberCount = myGuild?.members?.length || 0;
+  const guildXP = Number(myGuild?.totalXP || 0);
+  const guildLevel = Math.floor(guildXP / 1000) + 1;
+  const guildLevelProgress = guildXP % 1000;
 
   return (
     <motion.div
@@ -177,14 +205,28 @@ export default function SocialPage() {
               <EmptyState
                 icon={Users}
                 title="You're not in a guild"
-                description="Join an existing guild or create your own."
+                description="Join a squad, build a record together, or earn founder status by reaching 5,000 XP."
                 action={
-                  <div className="flex gap-3">
+                  <div className="flex w-full max-w-sm flex-col gap-3">
+                    {!canCreateGuild && (
+                      <div className="rounded-xl border border-cyan-300/10 bg-cyan-300/[0.04] p-3 text-left">
+                        <div className="mb-2 flex items-center justify-between gap-3 text-[10px]">
+                          <span className="font-bold uppercase tracking-wider text-slate-300">Guild founder</span>
+                          <span className="font-display text-cyan-200">{totalXP.toLocaleString()} / {GUILD_CREATION_XP.toLocaleString()} XP</span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-900">
+                          <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-400" style={{ width: `${Math.min(100, (totalXP / GUILD_CREATION_XP) * 100)}%` }} />
+                        </div>
+                        <p className="mt-2 text-[10px] text-slate-500">Earn {createXPRemaining.toLocaleString()} more XP to unlock guild creation.</p>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap justify-center gap-3">
                     <Button
                       variant="primary"
-                      onClick={() => setCreateModal(true)}
+                      disabled={!canCreateGuild}
+                      onClick={() => canCreateGuild && setCreateModal(true)}
                     >
-                      <Plus size={14} /> Create Guild
+                      <Plus size={14} /> {canCreateGuild ? "Create Guild" : "Unlock at 5,000 XP"}
                     </Button>
                     <Button
                       variant="secondary"
@@ -195,6 +237,7 @@ export default function SocialPage() {
                     >
                       Find Guild
                     </Button>
+                    </div>
                   </div>
                 }
               />
@@ -213,7 +256,7 @@ export default function SocialPage() {
                         <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1 font-display text-[10px] tracking-[0.2em] text-cyan-300">
                           GUILD COMMAND CENTER
                         </span>
-                        {isLeader && <Badge color="yellow">Leader</Badge>}
+                        {isLeader ? <Badge color="yellow">Leader</Badge> : myRole === "officer" ? <Badge color="cyan">Officer</Badge> : null}
                       </div>
                       <div className="flex items-center gap-4 min-w-0">
                         <div className="relative grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-cyan-300/30 bg-slate-950/80 shadow-[0_0_35px_rgba(34,211,238,0.12)]">
@@ -237,7 +280,7 @@ export default function SocialPage() {
                     </div>
 
                     <div className="flex flex-wrap gap-2 lg:max-w-xs lg:justify-end">
-                      {isLeader && (
+                      {canManageChallenges && (
                         <Button size="sm" variant="secondary" onClick={() => setChallengeModal(true)}>
                           <Plus size={13} /> Launch Challenge
                         </Button>
@@ -255,7 +298,14 @@ export default function SocialPage() {
                     <GuildMetric icon={Users} label="Roster" value={`${memberCount}/${myGuild.maxMembers}`} />
                     <GuildMetric icon={ZapIcon} label="Total XP" value={(myGuild.totalXP || 0).toLocaleString()} accent="cyan" />
                     <GuildMetric icon={ActivityIcon} label="This Week" value={(myGuild.weeklyXP || 0).toLocaleString()} accent="purple" />
-                    <GuildMetric icon={Trophy} label="Guild Level" value={myGuild.level || 1} accent="yellow" />
+                    <GuildMetric icon={Trophy} label="Guild Level" value={guildLevel} accent="yellow" />
+                  </div>
+
+                  <div className="relative mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-slate-400">{guildLevelProgress.toLocaleString()} / 1,000 XP to Guild Level {guildLevel + 1}</p>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800 sm:w-48">
+                      <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-cyan-300" style={{ width: `${guildLevelProgress / 10}%` }} />
+                    </div>
                   </div>
 
                   <div className="relative mt-4 rounded-2xl border border-white/5 bg-slate-950/35 p-4">
@@ -283,23 +333,30 @@ export default function SocialPage() {
                   )}
                 </motion.div>
 
+                <GuildActivityHub guildId={myGuild._id} userId={user?._id} />
+
                 {/* Members */}
                 <div className="glass rounded-2xl p-6 border border-slate-700/50">
                   <SectionHeader
                     label="Roster"
                     title={`Members (${myGuild.members?.length})`}
                   />
+                  {isLeader && <p className="mb-4 text-xs text-slate-500">Appoint trusted members as officers. Officers can launch challenges for the guild.</p>}
+                  {roleMutation.isError && <p role="alert" className="mb-3 rounded-lg border border-red-400/20 bg-red-400/5 px-3 py-2 text-xs text-red-300">{roleMutation.error?.response?.data?.message || "Could not update this guild role."}</p>}
                   <div className="space-y-3 max-h-64 overflow-y-auto no-scrollbar">
                     {(membersData?.members || myGuild.members || []).map(
                       (m, i) => {
                         const u = m.userId;
                         const name = u?.hunterName || `Member ${i + 1}`;
+                        const memberId = u?._id || u;
+                        const isGuildLeader = String(memberId) === String(myGuild.leaderId?._id || myGuild.leaderId);
+                        const role = m.role || (isGuildLeader ? "leader" : "member");
                         const lvl = u?.level ?? "—";
                         const rank = u?.rank ?? "—";
                         return (
                           <div
                             key={i}
-                            className="flex items-center justify-between"
+                            className="flex flex-col gap-3 rounded-xl border border-slate-800/70 bg-slate-950/20 p-3 sm:flex-row sm:items-center sm:justify-between"
                           >
                             <div className="flex items-center gap-3">
                               <div
@@ -313,25 +370,14 @@ export default function SocialPage() {
                                   <p className="font-heading text-sm text-slate-200">
                                     {name}
                                   </p>
-                                  {m.role === "leader" && (
-                                    <Crown
-                                      size={11}
-                                      className="text-yellow-400"
-                                    />
-                                  )}
-                                  {m.role === "officer" && (
-                                    <Crown
-                                      size={11}
-                                      className="text-slate-400"
-                                    />
-                                  )}
+                                  {role === "leader" ? <Badge color="yellow"><Crown size={10} /> Leader</Badge> : role === "officer" ? <Badge color="cyan"><ShieldCheck size={10} /> Officer</Badge> : null}
                                 </div>
                                 <p className="font-body text-xs text-slate-500">
                                   Lv.{lvl}
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
                               {m.contribution > 0 && (
                                 <span className="font-display text-xs text-cyan-400">
                                   {m.contribution.toLocaleString()} XP
@@ -342,6 +388,18 @@ export default function SocialPage() {
                                   rank={rank}
                                   className="text-[9px] px-1.5 py-0.5"
                                 />
+                              )}
+                              {isLeader && !isGuildLeader && (
+                                <select
+                                  aria-label={`Role for ${name}`}
+                                  value={role}
+                                  disabled={roleMutation.isPending}
+                                  onChange={(event) => roleMutation.mutate({ memberId, role: event.target.value })}
+                                  className="max-w-28 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-300 outline-none focus:border-cyan-400"
+                                >
+                                  <option value="member">Member</option>
+                                  <option value="officer">Officer</option>
+                                </select>
                               )}
                             </div>
                           </div>
@@ -376,7 +434,7 @@ export default function SocialPage() {
                       Complete challenges to earn XP for your guild.
                     </p>
                   </div>
-                  {isLeader && (
+                  {canManageChallenges && (
                     <Button
                       size="sm"
                       variant="secondary"
@@ -394,11 +452,11 @@ export default function SocialPage() {
                       No active challenges
                     </p>
                     <p className="font-body text-sm text-slate-600 mb-4">
-                      {isLeader
+                      {canManageChallenges
                         ? "Create a challenge for your guild members."
-                        : "Ask your guild leader to create challenges."}
+                        : "Ask a guild leader or officer to create challenges."}
                     </p>
-                    {isLeader && (
+                    {canManageChallenges && (
                       <Button
                         size="sm"
                         variant="secondary"
@@ -489,6 +547,11 @@ export default function SocialPage() {
           onSubmit={handleSubmit((d) => createMutation.mutate(d))}
           className="space-y-4"
         >
+          <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.05] p-3">
+            <p className="flex items-center gap-2 text-sm font-semibold text-cyan-100"><Medal size={15} /> Guild founder</p>
+            <p className="mt-1 text-xs text-slate-400">Creating a guild requires 5,000 Hunter XP. You have {totalXP.toLocaleString()} XP. You’ll become its leader and can appoint officers.</p>
+          </div>
+          {createMutation.isError && <p role="alert" className="rounded-lg border border-red-400/20 bg-red-400/5 px-3 py-2 text-xs text-red-300">{createMutation.error?.response?.data?.message || createMutation.error?.message || "Could not create your guild."}</p>}
           <Input
             label="Guild Name"
             placeholder="The Shadow Monarchs"
@@ -528,6 +591,7 @@ export default function SocialPage() {
             <Button
               variant="primary"
               type="submit"
+              disabled={!canCreateGuild}
               loading={createMutation.isPending}
             >
               Create Guild

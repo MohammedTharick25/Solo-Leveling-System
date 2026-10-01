@@ -8,9 +8,18 @@ import { generateWeeklyReport } from "../../modules/report/report.routes.js";
 import { rebuildLeaderboard } from "../../modules/leaderboard/leaderboard.routes.js";
 import { checkAndUpdateStreaks } from "../../modules/hunter/hunter.service.js";
 import { recordDailySnapshot } from "../../modules/analytics/analytics.routes.js";
+import { sendDueStreakReminders } from "../../modules/notification/push.service.js";
 
 export const startCronJobs = (io) => {
   console.log("[CRON] Scheduler started");
+
+  cron.schedule("* * * * *", async () => {
+    try {
+      await sendDueStreakReminders();
+    } catch (error) {
+      console.error("[CRON] Device streak reminder delivery failed:", error.message);
+    }
+  });
 
   // ── Midnight: check streaks FIRST, then expire old quests ─────────────────
   // Run at 00:01 so the day has clearly rolled over

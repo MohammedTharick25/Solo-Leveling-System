@@ -22,6 +22,51 @@ const guildChallengeSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+const sprintSchema = new mongoose.Schema({
+  title: { type: String, trim: true, maxlength: 80 },
+  durationMinutes: { type: Number, enum: [25, 50], required: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  createdAt: { type: Date, default: Date.now },
+  expiresAt: { type: Date, required: true },
+  status: { type: String, enum: ["active", "completed", "expired"], default: "active" },
+  participants: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    joinedAt: { type: Date, default: Date.now },
+    completedAt: Date,
+    focusSessionId: { type: mongoose.Schema.Types.ObjectId, ref: "FocusSession" },
+    minutes: { type: Number, default: 0 },
+  }],
+});
+
+const weeklyQuestSchema = new mongoose.Schema({
+  title: { type: String, default: "Complete 40 focus sessions together" },
+  targetSessions: { type: Number, default: 40, min: 1, max: 500 },
+  progress: { type: Number, default: 0 },
+  rewardXP: { type: Number, default: 300 },
+  periodStart: { type: Date, required: true },
+  status: { type: String, enum: ["active", "completed"], default: "active" },
+  participants: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    optedInAt: { type: Date, default: Date.now },
+    sessions: { type: Number, default: 0 },
+  }],
+});
+
+const checkInSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  dateKey: { type: String, required: true },
+  goal: { type: String, required: true, trim: true, maxlength: 160 },
+  createdAt: { type: Date, default: Date.now },
+  completedAt: Date,
+});
+
+const guildActivitySchema = new mongoose.Schema({
+  type: { type: String, enum: ["sprint", "quest", "checkin", "member", "challenge", "milestone"], required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  message: { type: String, required: true, maxlength: 180 },
+  createdAt: { type: Date, default: Date.now },
+});
+
 const guildSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, unique: true, trim: true },
@@ -50,6 +95,10 @@ const guildSchema = new mongoose.Schema(
     rank: { type: Number, default: 999 },
     level: { type: Number, default: 1 },
     challenges: [guildChallengeSchema],
+    sprints: [sprintSchema],
+    weeklyQuest: { type: weeklyQuestSchema, default: null },
+    checkIns: [checkInSchema],
+    activityFeed: [guildActivitySchema],
     isPublic: { type: Boolean, default: true },
     maxMembers: { type: Number, default: 50 },
     requirementRank: { type: String, default: "E" },

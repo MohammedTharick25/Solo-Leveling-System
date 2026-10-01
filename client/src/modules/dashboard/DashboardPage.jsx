@@ -16,11 +16,15 @@ import {
   ArrowRight,
   Loader2,
   Play,
+  Circle,
+  CheckCircle2,
+  ChevronRight,
 } from "lucide-react";
 import CountUp from "react-countup";
 
 // Stores & Logic
 import api from "../../lib/api.js";
+import { syncProgressionQueries } from "../../lib/systemSync.js";
 import { useHunterStore } from "../../stores/hunterStore.js";
 import {
   staggerContainer,
@@ -127,6 +131,11 @@ export default function DashboardPage() {
     queryFn: async () => (await api.get("/goals")).data.data,
   });
 
+  const { data: habitData, isLoading: habitsLoading } = useQuery({
+    queryKey: ["habits"],
+    queryFn: async () => (await api.get("/habits")).data.data,
+  });
+
   const { data: focusData, isLoading: focusLoading, isError: focusError } = useQuery({
     queryKey: ["focus-active"],
     queryFn: async () => (await api.get("/focus/active")).data.data.session,
@@ -153,6 +162,11 @@ export default function DashboardPage() {
     },
   });
 
+  const completeHabit = useMutation({
+    mutationFn: async (habitId) => (await api.post(`/habits/${habitId}/complete`)).data.data.habit,
+    onSuccess: () => syncProgressionQueries(queryClient),
+  });
+
   const quests = questData?.quests || [];
   const total = questData?.total || 0;
   const completed = questData?.completed || 0;
@@ -160,6 +174,11 @@ export default function DashboardPage() {
 
   const activeQuests = quests.filter((q) => q.status === "active").slice(0, 3);
   const completionRate = total ? Math.round((completed / total) * 100) : 0;
+  const dueHabits = (habitData?.habits || []).filter((habit) => habit.isDueToday);
+  const completedHabits = dueHabits.filter((habit) => habit.completedToday).length;
+  const habitCompletionRate = dueHabits.length
+    ? Math.round((completedHabits / dueHabits.length) * 100)
+    : 0;
 
   const goals = goalsData?.goals || [];
   const activeGoals = goals.filter((goal) => goal.status === "active");
@@ -566,6 +585,87 @@ export default function DashboardPage() {
               actionError={startRecommendedFocus.error?.response?.data?.message}
             />
           </div>
+        </motion.section>
+
+        <motion.section
+          variants={staggerItem}
+          className="rounded-[28px] border border-emerald-300/10 bg-slate-950/65 p-5 shadow-xl backdrop-blur-xl sm:p-6"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-emerald-300">
+                Daily Rhythm
+              </p>
+              <h2 className="mt-1 font-heading text-xl font-black uppercase tracking-tight text-white">
+                Today&apos;s habits
+              </h2>
+            </div>
+            <Link
+              to="/habits"
+              className="inline-flex items-center gap-1 self-start text-[9px] font-black uppercase tracking-widest text-emerald-200 transition hover:text-white sm:self-auto"
+            >
+              Open habits <ChevronRight size={13} />
+            </Link>
+          </div>
+
+          {habitsLoading ? (
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {[0, 1, 2].map((item) => <div key={item} className="skeleton h-14 rounded-xl" />)}
+            </div>
+          ) : dueHabits.length === 0 ? (
+            <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-white/5 bg-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs leading-5 text-slate-400">
+                {(habitData?.habits || []).length
+                  ? "Nothing is scheduled for today. Enjoy the breathing room or adjust your routine."
+                  : "A small repeatable habit can make your progress easier to sustain."}
+              </p>
+              <Link to="/habits" className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg border border-emerald-300/15 bg-emerald-300/[0.06] px-3 text-[9px] font-black uppercase tracking-widest text-emerald-100 transition hover:bg-emerald-300/10">
+                {(habitData?.habits || []).length ? "Review routine" : "Build a routine"}
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="mt-5 flex items-center gap-3">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-900">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${habitCompletionRate}%` }}
+                    transition={{ duration: 0.7 }}
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400"
+                  />
+                </div>
+                <span className="shrink-0 font-display text-xs font-black text-emerald-200">
+                  {completedHabits}/{dueHabits.length}
+                </span>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {dueHabits.slice(0, 3).map((habit) => (
+                  <div key={habit._id} className="flex min-w-0 items-center gap-3 rounded-xl border border-white/5 bg-white/[0.025] px-3 py-2.5">
+                    <span className="text-lg" aria-hidden="true">{habit.icon || "✓"}</span>
+                    <span className={`min-w-0 flex-1 truncate text-xs font-semibold ${habit.completedToday ? "text-slate-500 line-through" : "text-slate-200"}`}>
+                      {habit.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => completeHabit.mutate(habit._id)}
+                      disabled={habit.completedToday || completeHabit.isPending}
+                      aria-label={habit.completedToday ? `${habit.name} completed` : `Complete ${habit.name}`}
+                      title={habit.completedToday ? "Completed today" : "Complete habit and earn XP"}
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition disabled:cursor-default ${habit.completedToday ? "text-emerald-300" : "text-slate-500 hover:bg-emerald-300/10 hover:text-emerald-200 disabled:opacity-50"}`}
+                    >
+                      {habit.completedToday ? <CheckCircle2 size={18} /> : completeHabit.isPending && completeHabit.variables === habit._id ? <Loader2 size={17} className="animate-spin" /> : <Circle size={18} />}
+                    </button>
+                  </div>
+                ))}
+                {dueHabits.length > 3 && (
+                  <Link to="/habits" className="flex items-center justify-center rounded-xl border border-dashed border-white/10 px-3 py-2.5 text-[10px] font-bold text-slate-500 transition hover:border-emerald-300/20 hover:text-emerald-100">
+                    +{dueHabits.length - 3} more habits
+                  </Link>
+                )}
+              </div>
+              {completeHabit.error && <p role="alert" className="mt-3 text-[10px] text-red-300">{completeHabit.error.response?.data?.message || "Could not complete this habit. Try again."}</p>}
+            </>
+          )}
         </motion.section>
 
         {/* =========================================================

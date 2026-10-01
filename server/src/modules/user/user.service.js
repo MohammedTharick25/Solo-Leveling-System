@@ -15,11 +15,13 @@ import Analytics from "../analytics/analytics.model.js";
 import Habit from "../habits/habit.model.js";
 import Notification from "../notification/notification.model.js";
 import HunterReport from "../report/hunterReport.mode.js";
+import Goal from "../goals/goal.model.js";
 import Leaderboard from "../leaderboard/leaderboard.model.js";
 import Guild from "../guild/guild.model.js";
 import RefreshToken from "../auth/auth.model.js";
 import cloudinary from "../../lib/cloudinary.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
+import { cancelSubscription } from "../billing/billing.service.js";
 
 const DEFAULT_SETTINGS = {
   notifications: {
@@ -32,6 +34,8 @@ const DEFAULT_SETTINGS = {
     progression: true,
     social: true,
     weeklyReports: true,
+    streakReminderEnabled: false,
+    streakReminderTime: "19:00",
   },
   preferences: {
     soundEffects: true,
@@ -692,8 +696,14 @@ class UserService {
     if (password && !(await user.comparePassword(password))) {
       throw new AppError("Password is incorrect.", 401);
     }
-    user.isActive = false;
-    await user.save({ validateBeforeSave: false });
+    if (
+      user.billing?.provider === "razorpay" &&
+      user.billing?.razorpaySubscriptionId &&
+      !["cancelled", "completed", "expired"].includes(user.billing.status)
+    ) {
+      await cancelSubscription(userId, true);
+    }
+    await User.updateOne({ _id: userId }, { $set: { isActive: false } });
     await RefreshToken.updateMany({ userId }, { isRevoked: true });
     return true;
   }
@@ -703,6 +713,14 @@ class UserService {
     if (!user) throw new AppError("User not found", 404);
     if (!password || !(await user.comparePassword(password))) {
       throw new AppError("Password is incorrect.", 401);
+    }
+
+    if (
+      user.billing?.provider === "razorpay" &&
+      user.billing?.razorpaySubscriptionId &&
+      !["cancelled", "completed", "expired"].includes(user.billing.status)
+    ) {
+      await cancelSubscription(userId, false);
     }
 
     const id = user._id;
@@ -752,11 +770,36 @@ class UserService {
   }
 
   async exportAccountData(userId) {
-    const [user, hunter, stats, quests, habits, journals, notifications, reports] = await Promise.all([
+    const [
+      user,
+      hunter,
+      stats,
+      quests,
+      goals,
+      focusSessions,
+      shadows,
+      bosses,
+      dungeons,
+      taskRaids,
+      knowledgeNotes,
+      analytics,
+      habits,
+      journals,
+      notifications,
+      reports,
+    ] = await Promise.all([
       User.findById(userId).lean(),
       Hunter.findOne({ userId }).lean(),
       Stats.findOne({ userId }).lean(),
       Quest.find({ userId }).sort({ createdAt: -1 }).limit(1000).lean(),
+      Goal.find({ userId }).sort({ createdAt: -1 }).limit(500).lean(),
+      FocusSession.find({ userId }).sort({ startedAt: -1 }).limit(2000).lean(),
+      Shadow.find({ userId }).lean(),
+      Boss.find({ userId }).sort({ createdAt: -1 }).limit(500).lean(),
+      Dungeon.find({ userId }).sort({ createdAt: -1 }).limit(500).lean(),
+      TaskRaid.find({ userId }).sort({ createdAt: -1 }).limit(500).lean(),
+      KnowledgeNote.find({ userId }).sort({ updatedAt: -1 }).limit(2000).lean(),
+      Analytics.find({ userId }).sort({ date: -1 }).limit(365).lean(),
       Habit.find({ userId }).lean(),
       Journal.find({ userId }).sort({ date: -1 }).limit(365).lean(),
       Notification.find({ userId }).sort({ createdAt: -1 }).limit(500).lean(),
@@ -774,6 +817,14 @@ class UserService {
       hunter,
       stats,
       quests,
+      goals,
+      focusSessions,
+      shadows,
+      bosses,
+      dungeons,
+      taskRaids,
+      knowledgeNotes,
+      analytics,
       habits,
       journals,
       notifications,

@@ -11,6 +11,7 @@ import { createNotification } from "../notification/notification.service.js";
 import { startOfDay, endOfDay, clamp } from "../../lib/helpers.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
 import { emitToUser } from "../../infrastructure/socket/socketManager.js";
+import { recordGuildCelebration } from "../guild/guild.service.js";
 
 /**
  * Award XP to a hunter. Handles level-ups and rank-ups.
@@ -107,6 +108,12 @@ export const awardXP = async (userId, baseXP, io = null) => {
   }
 
   await hunter.save();
+  if (newLevel > previousLevel) {
+    await recordGuildCelebration(userId, "milestone", `reached Hunter level ${newLevel}`, io);
+  }
+  if (newRank !== previousRank) {
+    await recordGuildCelebration(userId, "milestone", `advanced to ${newRank} Rank`, io);
+  }
   return {
     hunter,
     xpEarned,
@@ -164,7 +171,7 @@ export const awardStatGains = async (userId, statRewards = []) => {
  * HOW IT WORKS:
  * - Every day the system generates exactly 5 quests for the user.
  * - If the user completes ALL 5 quests before midnight → streak increases.
- * - If they fail to complete all 5 → streak resets to 0 + XP penalty.
+ * - If they miss a day, the streak pauses without an XP penalty.
  * - Streak is checked and updated by cron at midnight (checkAndUpdateStreaks).
  * - updateStreakOnQuestComplete() is called after each quest completion
  *   to detect same-day full completion and update lastActiveDate.
@@ -190,6 +197,8 @@ export const updateStreakOnQuestComplete = async (userId, io = null) => {
     }),
   ]);
 
+  let returnedAfterBreak = false;
+
   // All quests done for today → update active date so streak persists overnight
   if (totalToday > 0 && completedToday >= totalToday) {
     const lastActiveDay = hunter.lastActiveDate
@@ -203,13 +212,19 @@ export const updateStreakOnQuestComplete = async (userId, io = null) => {
       const wasActivePrev =
         lastActiveDay && lastActiveDay.getTime() === yesterday.getTime();
 
+      returnedAfterBreak = Boolean(hunter.streakPausedAt);
       hunter.currentStreak = wasActivePrev ? hunter.currentStreak + 1 : 1;
       if (hunter.currentStreak > hunter.longestStreak) {
         hunter.longestStreak = hunter.currentStreak;
       }
       hunter.lastActiveDate = new Date();
+      hunter.streakPausedAt = null;
 
       await hunter.save();
+
+      if (returnedAfterBreak) {
+        await recordGuildCelebration(userId, "milestone", "returned to their streak after a break", io);
+      }
 
       // Streak milestone notifications
       const milestones = [3, 7, 14, 21, 30, 60, 90, 180, 365];
@@ -222,17 +237,18 @@ export const updateStreakOnQuestComplete = async (userId, io = null) => {
           { streak: hunter.currentStreak },
           io,
         );
+        await recordGuildCelebration(userId, "milestone", `reached a ${hunter.currentStreak}-day streak`, io);
       }
     }
   }
 
-  return hunter;
+  return { hunter, returnedAfterBreak };
 };
 
 /**
  * Called by CRON at midnight.
- * Checks if the user completed all their quests yesterday.
- * If not → streak resets + XP penalty.
+ * Checks whether yesterday's daily quests were completed. Missing a day pauses
+ * the current streak but never removes XP or guild progress.
  */
 export const checkAndUpdateStreaks = async (userId, io = null) => {
   const hunter = await Hunter.findOne({ userId });
@@ -266,27 +282,23 @@ export const checkAndUpdateStreaks = async (userId, io = null) => {
 
   if (!allDone && !completedAllYesterday && hunter.currentStreak > 0) {
     const lostStreak = hunter.currentStreak;
-    const xpPenalty = Math.min(lostStreak * 20, 500); // max 500 XP penalty
-
     hunter.currentStreak = 0;
+    hunter.streakPausedAt = new Date();
     await hunter.save();
-
-    // Deduct XP penalty
-    await deductXP(userId, xpPenalty, io);
 
     await createNotification(
       userId,
       "systemWarning",
-      "⚠️ STREAK BROKEN",
-      `You failed to complete all daily quests yesterday. Your ${lostStreak}-day streak has been lost. −${xpPenalty} XP penalty applied.`,
-      { lostStreak, xpPenalty },
+      "STREAK ON PAUSE",
+      `Your ${lostStreak}-day streak took a pause. Nothing was taken. Start again whenever you're ready.`,
+      { lostStreak, xpPenalty: 0 },
       io,
     );
 
     if (io) {
       await emitToUser(io, userId, "system:streak-broken", {
         lostStreak,
-        xpPenalty,
+        xpPenalty: 0,
       }, "progression");
     }
   }

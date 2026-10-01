@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { useHunterStore } from "../../stores/hunterStore.js";
 import {
   X,
   ChevronRight,
@@ -74,18 +76,52 @@ const STEPS = [
   },
 ];
 
+const QUICK_START_STEPS = [
+  {
+    ...STEPS[0],
+    title: "Choose a goal that matters",
+    description: "Start with something you want to improve: a subject to learn, a project to finish, or a personal routine to build. A clear goal gives your daily effort direction.",
+    emoji: "🎯",
+    accent: "YOUR DIRECTION",
+    icon: Target,
+    tips: ["Choose one priority to begin", "Describe the outcome you want", "Set a realistic target date"],
+  },
+  {
+    ...STEPS[1],
+    title: "Make progress with one quest",
+    description: "Quests turn a big intention into a small action you can finish today. Complete a quest to build momentum and see your progress grow.",
+    emoji: "⚔️",
+    accent: "TODAY’S ACTION",
+    icon: Check,
+    tips: ["Pick a task you can finish today", "Link it to a goal when it fits", "Consistency matters more than a perfect day"],
+  },
+  {
+    ...STEPS[3],
+    title: "Give your next step your focus",
+    description: "Start a focus session for your chosen quest or goal. Completed focus time contributes to your progress, so you can see your effort add up.",
+    emoji: "⏱️",
+    accent: "FOCUS SESSION",
+    icon: Zap,
+    tips: ["Choose a manageable session length", "Focus on one task at a time", "Pick up where you left off whenever you return"],
+  },
+];
+
 const TOUR_KEY = "solo-leveling-tour-complete";
 
 export default function OnboardingTutorial() {
+  const navigate = useNavigate();
+  const user = useHunterStore((state) => state.user);
+  const accountId = user?._id || user?.id || "guest";
+  const tourKey = `${TOUR_KEY}:${accountId}`;
   const [step, setStep] = useState(0);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!localStorage.getItem(TOUR_KEY)) {
+    if (!localStorage.getItem(tourKey)) {
       const timer = setTimeout(() => setVisible(true), 700);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [tourKey]);
 
   useEffect(() => {
     if (!visible) return undefined;
@@ -98,17 +134,18 @@ export default function OnboardingTutorial() {
     return () => window.removeEventListener("keydown", onKeyDown);
   });
 
-  const dismiss = () => {
-    localStorage.setItem(TOUR_KEY, "true");
+  const dismiss = (openGoals = false) => {
+    localStorage.setItem(tourKey, "true");
     setVisible(false);
+    if (openGoals) navigate("/goals");
   };
-  const next = () => (step < STEPS.length - 1 ? setStep((s) => s + 1) : dismiss());
+  const next = () => (step < QUICK_START_STEPS.length - 1 ? setStep((s) => s + 1) : dismiss(true));
   const prev = () => step > 0 && setStep((s) => s - 1);
 
   if (!visible) return null;
-  const current = STEPS[step];
+  const current = QUICK_START_STEPS[step];
   const Icon = current.icon;
-  const progress = ((step + 1) / STEPS.length) * 100;
+  const progress = ((step + 1) / QUICK_START_STEPS.length) * 100;
 
   return (
     <AnimatePresence>
@@ -135,7 +172,7 @@ export default function OnboardingTutorial() {
                 <p className="text-[11px] text-slate-600 mt-1">Use ← → to navigate · Esc to exit</p>
               </div>
               <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
-                <span>{step + 1}</span><span>/</span><span>{STEPS.length}</span>
+                <span>{step + 1}</span><span>/</span><span>{QUICK_START_STEPS.length}</span>
               </div>
             </div>
 
@@ -179,7 +216,7 @@ export default function OnboardingTutorial() {
 
             <div className="mt-8 pt-5 border-t border-slate-800/70 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex gap-1.5">
-                {STEPS.map((_, i) => (
+                {QUICK_START_STEPS.map((_, i) => (
                   <button key={i} onClick={() => setStep(i)} aria-label={`Go to step ${i + 1}`} className={`h-1.5 rounded-full transition-all ${i === step ? "w-7 bg-cyan-400" : i < step ? "w-3 bg-cyan-700" : "w-3 bg-slate-700 hover:bg-slate-600"}`} />
                 ))}
               </div>
@@ -187,7 +224,7 @@ export default function OnboardingTutorial() {
                 <button onClick={prev} disabled={step === 0} className="btn-ghost flex items-center gap-1 disabled:opacity-25"><ChevronLeft size={15} /> Back</button>
                 <button onClick={dismiss} className="font-body text-xs text-slate-600 hover:text-slate-300 px-3 py-2 transition-colors">Skip</button>
                 <button onClick={next} className="btn-primary flex items-center gap-1.5 min-w-[112px] justify-center">
-                  {step === STEPS.length - 1 ? <><ArrowUpRight size={14} /> Enter System</> : <>Continue <ChevronRight size={15} /></>}
+                  {step === QUICK_START_STEPS.length - 1 ? <><ArrowUpRight size={14} /> Create a goal</> : <>Continue <ChevronRight size={15} /></>}
                 </button>
               </div>
             </div>
@@ -198,4 +235,8 @@ export default function OnboardingTutorial() {
   );
 }
 
-export const resetTour = () => localStorage.removeItem(TOUR_KEY);
+export const resetTour = () => {
+  Object.keys(localStorage)
+    .filter((key) => key.startsWith(`${TOUR_KEY}:`))
+    .forEach((key) => localStorage.removeItem(key));
+};

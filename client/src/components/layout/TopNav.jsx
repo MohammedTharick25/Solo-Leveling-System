@@ -7,7 +7,7 @@ import { useHunterStore } from "../../stores/hunterStore.js";
 import { RANK_COLORS, formatXP } from "../../lib/xpFormulas.js";
 import NotificationPanel from "./NotificationPanel.jsx";
 
-export default function TopNav({ onMenuClick }) {
+export default function TopNav({ onMenuClick, menuOpen = false }) {
   const { hunter, unreadCount, settings } = useHunterStore();
   const [notifOpen, setNotifOpen] = useState(false);
   const rankColor = RANK_COLORS[hunter?.rank] || "text-slate-400";
@@ -44,6 +44,10 @@ export default function TopNav({ onMenuClick }) {
       {/* Mobile menu toggle */}
       <button
         onClick={onMenuClick}
+        type="button"
+        aria-label="Open navigation menu"
+        aria-controls="mobile-sidebar"
+        aria-expanded={menuOpen}
         className="lg:hidden p-2 text-slate-400 hover:text-slate-200 transition-colors rounded-lg"
       >
         <Menu size={20} />
@@ -90,6 +94,10 @@ export default function TopNav({ onMenuClick }) {
       <div className="relative flex items-center">
         <button
           onClick={handleBellClick}
+          type="button"
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+          aria-expanded={notifOpen}
+          aria-controls="notification-panel"
           className="relative p-2 rounded-xl text-slate-400 hover:text-slate-100
                      hover:bg-slate-800/70 transition-all duration-200"
         >

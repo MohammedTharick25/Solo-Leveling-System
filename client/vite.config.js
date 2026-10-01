@@ -7,7 +7,14 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.js",
       registerType: "autoUpdate",
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff2}"],
+        rollupFormat: "iife",
+      },
       manifest: {
         name: "Solo Leveling — Personal Evolution OS",
         short_name: "Solo Leveling",

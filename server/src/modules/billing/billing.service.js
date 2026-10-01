@@ -554,10 +554,19 @@ export const verifyWebhookSignature = (rawBody, signature) => {
 };
 
 export const processWebhook = async (event) => {
-  const providerSubscription = event?.payload?.subscription?.entity;
-  if (!providerSubscription?.id) return;
+  const eventSubscription = event?.payload?.subscription?.entity;
+  if (!eventSubscription?.id) return;
+
+  // Razorpay retries webhooks and may deliver older events after newer ones.
+  // Reconcile from the current subscription resource so a stale event cannot
+  // roll local access back to an earlier status.
+  const providerSubscription = await razorpayRequest(
+    `/subscriptions/${encodeURIComponent(eventSubscription.id)}`,
+  );
   const payment = event?.payload?.payment?.entity;
-  if (payment?.id) providerSubscription.payment_id = payment.id;
+  if (payment?.id && payment.subscription_id === providerSubscription.id) {
+    providerSubscription.payment_id = payment.id;
+  }
   await applyProviderSubscription(providerSubscription);
 };
 

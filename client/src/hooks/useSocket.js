@@ -140,8 +140,8 @@ export const useSocket = () => {
       queryClient.invalidateQueries({ queryKey: ["quests"] });
     });
 
-    socket.on("system:streak-broken", ({ lostStreak, xpPenalty }) => {
-      deliverSystemEvent("system:streak-broken", "⚠️ STREAK BROKEN", `Your ${lostStreak}-day streak has ended. −${xpPenalty} XP penalty.`, store.pushToast);
+    socket.on("system:streak-broken", ({ lostStreak }) => {
+      deliverSystemEvent("system:streak-broken", "STREAK ON PAUSE", `Your ${lostStreak}-day streak paused. Nothing was taken. Start again whenever you're ready.`, store.pushToast);
       queryClient.invalidateQueries({ queryKey: ["hunter"] });
     });
 

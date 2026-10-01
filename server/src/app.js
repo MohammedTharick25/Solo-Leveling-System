@@ -58,6 +58,7 @@ app.use(
           "'self'",
           "http://localhost:5000",
           "http://localhost:5173",
+          "http://localhost:5174",
           "https://solo-leveling-system-frontend.onrender.com",
           "https://solo-leveling-system-backend-we1h.onrender.com",
           "ws://localhost:5000",
@@ -80,6 +81,8 @@ app.use(
 const allowedOrigins = [
   config.CLIENT_URL,
   config.PRODUCTION_URL,
+  "http://localhost:5173",
+  "http://localhost:5174",
 ];
 
 app.use(

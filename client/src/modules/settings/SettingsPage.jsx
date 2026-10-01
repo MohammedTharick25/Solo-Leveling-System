@@ -26,6 +26,7 @@ import api from "../../lib/api.js";
 import { pageVariants, staggerContainer, staggerItem } from "../../lib/animations.js";
 import { SectionHeader, Button, Card, Input } from "../../components/ui/PageLoader.jsx";
 import { useHunterStore } from "../../stores/hunterStore.js";
+import StreakReminderControl from "../../components/ui/StreakReminderControl.jsx";
 
 const DEFAULT_SETTINGS = {
   notifications: {
@@ -38,6 +39,8 @@ const DEFAULT_SETTINGS = {
     progression: true,
     social: true,
     weeklyReports: true,
+    streakReminderEnabled: false,
+    streakReminderTime: "19:00",
   },
   preferences: { soundEffects: true, compactMode: false },
   privacy: { publicProfile: true, showPublicStats: true, showPublicAchievements: true },
@@ -439,6 +442,19 @@ export default function SettingsPage() {
                 </div>
               )}
               <ToggleRow label="Email notifications" description="Allow non-password-reset notification emails from The System." checked={effectiveSettings.notifications.email} disabled={!effectiveSettings.notifications.enabled} onChange={(v) => updateSetting("notifications", "email", v)} />
+              <StreakReminderControl
+                enabled={effectiveSettings.notifications.streakReminderEnabled}
+                time={effectiveSettings.notifications.streakReminderTime}
+                onPreferenceChange={(enabled, time) => {
+                  const next = mergeSettings(effectiveSettings);
+                  next.notifications.streakReminderEnabled = enabled;
+                  next.notifications.streakReminderTime = time;
+                  setLocalSettings(next);
+                  setSettings(next);
+                  setUser({ ...useHunterStore.getState().user, settings: next });
+                  queryClient.invalidateQueries({ queryKey: ["user-settings"] });
+                }}
+              />
             </Card>
 
             <Card>
@@ -515,14 +531,14 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div className="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5">
                   <p className="font-semibold text-sm text-yellow-300">Deactivate account</p>
-                  <p className="text-xs text-slate-500 mt-1 mb-3">Temporarily disables access. Your data remains stored and the account can be restored by an administrator.</p>
+                  <p className="text-xs text-slate-500 mt-1 mb-3">Temporarily disables sign-in. Your data remains stored. Active paid subscriptions stop renewing at the end of the current billing period.</p>
                   <input className="input max-w-sm mb-2" type="password" placeholder="Password" value={dangerPassword} onChange={(e) => setDangerPassword(e.target.value)} />
                   <br />
                   <Button variant="secondary" loading={deactivateMutation.isPending} onClick={() => { if (dangerPassword) deactivateMutation.mutate(dangerPassword); }}><Shield size={14} /> Deactivate</Button>
                 </div>
                 <div className="p-4 rounded-xl border border-red-500/30 bg-red-500/5">
                   <p className="font-semibold text-sm text-red-300">Permanently delete account</p>
-                  <p className="text-xs text-slate-500 mt-1 mb-3">This permanently deletes your profile, progression, quests, journals, reports, notifications and other personal records. This cannot be undone.</p>
+                  <p className="text-xs text-slate-500 mt-1 mb-3">This permanently deletes your profile, progression and personal records. Any active Razorpay subscription is cancelled immediately to stop future renewals. This cannot be undone.</p>
                   <Button variant="danger" loading={deleteMutation.isPending} onClick={() => { if (dangerPassword && window.confirm("Permanently delete your account and personal data? This cannot be undone.")) deleteMutation.mutate(dangerPassword); }}><Trash2 size={14} /> Delete Account</Button>
                 </div>
               </div>

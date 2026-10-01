@@ -34,6 +34,23 @@ const challengeValidators = [
   validate,
 ];
 
+const roleValidators = [
+  body("role").isIn(["member", "officer"]).withMessage("Choose member or officer."),
+  validate,
+];
+
+const sprintValidators = [
+  body("durationMinutes").isIn([25, 50]).withMessage("Choose a 25- or 50-minute sprint."),
+  body("title").optional().isString().isLength({ max: 80 }),
+  validate,
+];
+
+const checkInValidators = [
+  body("goal").isString().trim().isLength({ min: 1, max: 160 }).withMessage("Your daily quest must be 1-160 characters."),
+  body("timeZone").optional().isString().isLength({ max: 100 }),
+  validate,
+];
+
 const router = Router();
 router.use(protect, requireAwakened);
 
@@ -44,6 +61,14 @@ router.post("/:id/join", GuildController.join);
 router.delete("/:id/leave", GuildController.leave);
 router.get("/:id/members", GuildController.getMembers);
 router.patch("/:id/promote/:memberId", GuildController.promote);
+router.patch("/:id/members/:memberId/role", roleValidators, GuildController.setMemberRole);
+
+router.get("/:id/activities", GuildController.getActivities);
+router.post("/:id/sprints", sprintValidators, GuildController.createSprint);
+router.post("/:id/sprints/:sprintId/join", GuildController.joinSprint);
+router.post("/:id/weekly-quest/join", GuildController.joinWeeklyQuest);
+router.post("/:id/check-ins", checkInValidators, GuildController.createCheckIn);
+router.post("/:id/check-ins/:checkInId/complete", GuildController.completeCheckIn);
 
 // ── Challenges ─────────────────────────────────────────────────────────────
 router.post(

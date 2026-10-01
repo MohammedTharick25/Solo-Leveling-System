@@ -36,12 +36,20 @@ export default function AppShell() {
 
   return (
     <div className="flex h-screen bg-slate-950 overflow-hidden">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[1000] focus:rounded-xl focus:bg-cyan-300 focus:px-4 focus:py-3 focus:font-bold focus:text-slate-950"
+      >
+        Skip to main content
+      </a>
       {/* Sidebar */}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
+          aria-hidden="true"
+          role="presentation"
           className="fixed inset-0 z-20 bg-black/60 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -49,9 +57,9 @@ export default function AppShell() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TopNav onMenuClick={() => setSidebarOpen(true)} />
+        <TopNav onMenuClick={() => setSidebarOpen(true)} menuOpen={sidebarOpen} />
 
-        <main className="flex-1 overflow-y-auto">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none">
           {/* Background radial glow */}
           <div className="pointer-events-none fixed inset-0 bg-hero-gradient opacity-60" />
 

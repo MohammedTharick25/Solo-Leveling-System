@@ -588,7 +588,18 @@ export const completeQuest = async (questId, userId, io = null) => {
   quest.earnedXP = xpResult.xpEarned;
   await quest.save();
 
-  await updateStreakOnQuestComplete(userId, io);
+  const streakUpdate = await updateStreakOnQuestComplete(userId, io);
+  if (streakUpdate?.returnedAfterBreak) {
+    const comebackAward = await awardXP(userId, 25, io);
+    await createNotification(
+      userId,
+      "streakMilestone",
+      `WELCOME BACK — +${comebackAward.xpEarned} XP`,
+      "You completed today's quests and started a fresh streak. Showing up again earned you a return bonus.",
+      { streak: streakUpdate.hunter.currentStreak, xpEarned: comebackAward.xpEarned, comeback: true },
+      io,
+    );
+  }
   const goalProgress = await syncGoalProgressFromQuest(quest, userId);
   await checkShadowUnlocks(userId, io);
   await checkBossSpawn(userId, io);

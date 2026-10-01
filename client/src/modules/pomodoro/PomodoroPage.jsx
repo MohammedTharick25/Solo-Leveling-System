@@ -29,6 +29,7 @@ export default function PomodoroPage() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const recommendedAction = location.state?.recommendedAction;
+  const guildSprintId = location.state?.guildSprintId;
   const recommendedDuration = Number(recommendedAction?.durationMinutes);
   const normalizedRecommendedDuration = Math.max(
     1,
@@ -227,6 +228,7 @@ export default function PomodoroPage() {
       plannedDuration: selectedType.duration,
       linkedQuestId: linkedQuestId || null,
       linkedGoalId: linkedGoalId || null,
+      linkedGuildSprintId: guildSprintId || null,
     });
   };
 
@@ -273,6 +275,11 @@ export default function PomodoroPage() {
         {resumed && (
           <p className="font-heading text-sm text-cyan-400 mt-1">
             ↩ Resumed an existing session
+          </p>
+        )}
+        {guildSprintId && (
+          <p className="mt-2 inline-flex items-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-2 font-heading text-xs text-cyan-100">
+            Guild sprint linked <span className="text-cyan-300">·</span> finish at least 80% to count your contribution
           </p>
         )}
       </div>

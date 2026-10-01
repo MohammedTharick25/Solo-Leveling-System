@@ -101,6 +101,8 @@ const userSchema = new mongoose.Schema(
         progression: { type: Boolean, default: true },
         social: { type: Boolean, default: true },
         weeklyReports: { type: Boolean, default: true },
+        streakReminderEnabled: { type: Boolean, default: false },
+        streakReminderTime: { type: String, default: "19:00" },
       },
       preferences: {
         soundEffects: { type: Boolean, default: true },
@@ -112,6 +114,15 @@ const userSchema = new mongoose.Schema(
         showPublicAchievements: { type: Boolean, default: true },
       },
     },
+    pushSubscriptions: [{
+      endpoint: { type: String, required: true },
+      keys: {
+        p256dh: { type: String, required: true },
+        auth: { type: String, required: true },
+      },
+      createdAt: { type: Date, default: Date.now },
+    }],
+    lastStreakReminderDate: { type: String, default: "" },
     lastLoginAt: Date,
     passwordResetTokenHash: { type: String, select: false, default: null },
     passwordResetExpiresAt: { type: Date, select: false, default: null },
@@ -132,6 +143,8 @@ userSchema.methods.comparePassword = async function (candidate) {
 userSchema.methods.toSafeObject = function () {
   const obj = this.toObject();
   delete obj.password;
+  delete obj.pushSubscriptions;
+  delete obj.lastStreakReminderDate;
   return obj;
 };
 

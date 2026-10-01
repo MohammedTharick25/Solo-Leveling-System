@@ -46,6 +46,16 @@ export const promote = asyncHandler(async (req, res) => {
   sendSuccess(res, { guild }, "Member promoted to officer.");
 });
 
+export const setMemberRole = asyncHandler(async (req, res) => {
+  const guild = await GuildService.setMemberRole(
+    req.userId,
+    req.params.memberId,
+    req.params.id,
+    req.body.role,
+  );
+  sendSuccess(res, { guild }, "Guild role updated.");
+});
+
 export const addChallenge = asyncHandler(async (req, res) => {
   const io = req.app.get("io");
   const guild = await GuildService.addChallenge(
@@ -66,4 +76,34 @@ export const completeChallenge = asyncHandler(async (req, res) => {
     io,
   );
   sendSuccess(res, { guild }, "Challenge marked complete.");
+});
+
+export const getActivities = asyncHandler(async (req, res) => {
+  const activities = await GuildService.getGuildActivities(req.userId, req.params.id);
+  sendSuccess(res, activities, "Guild activities retrieved.");
+});
+
+export const createSprint = asyncHandler(async (req, res) => {
+  const sprint = await GuildService.createGuildSprint(req.userId, req.params.id, req.body, req.app.get("io"));
+  sendSuccess(res, { sprint }, "Guild sprint created.", 201);
+});
+
+export const joinSprint = asyncHandler(async (req, res) => {
+  const sprint = await GuildService.joinGuildSprint(req.userId, req.params.id, req.params.sprintId, req.app.get("io"));
+  sendSuccess(res, { sprint }, "Joined the guild sprint.");
+});
+
+export const joinWeeklyQuest = asyncHandler(async (req, res) => {
+  const weeklyQuest = await GuildService.joinWeeklyGuildQuest(req.userId, req.params.id, req.app.get("io"));
+  sendSuccess(res, { weeklyQuest }, "Joined the weekly guild quest.");
+});
+
+export const createCheckIn = asyncHandler(async (req, res) => {
+  const checkIn = await GuildService.createGuildCheckIn(req.userId, req.params.id, req.body.goal, req.body.timeZone, req.app.get("io"));
+  sendSuccess(res, { checkIn }, "Guild check-in saved.", 201);
+});
+
+export const completeCheckIn = asyncHandler(async (req, res) => {
+  const checkIn = await GuildService.completeGuildCheckIn(req.userId, req.params.id, req.params.checkInId, req.app.get("io"));
+  sendSuccess(res, { checkIn }, "Guild check-in completed.");
 });

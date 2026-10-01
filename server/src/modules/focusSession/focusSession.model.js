@@ -35,6 +35,11 @@ const focusSessionSchema = new mongoose.Schema(
       ref: "Quest",
       default: null,
     },
+    linkedGuildSprintId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Guild",
+      default: null,
+    },
     notes: String,
     tags: [String],
     startedAt: { type: Date, required: true },

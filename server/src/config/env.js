@@ -6,6 +6,9 @@ const config = {
   PORT: parseInt(process.env.PORT, 10) || 5000,
   CLIENT_URL: process.env.CLIENT_URL || "http://localhost:5173",
   PRODUCTION_URL: process.env.PRODUCTION_URL,
+  VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
+  VAPID_SUBJECT: process.env.VAPID_SUBJECT || "mailto:notifications@solo-leveling.app",
 
   MONGODB_URI:
     process.env.MONGODB_URI || "mongodb://localhost:27017/solo-leveling",

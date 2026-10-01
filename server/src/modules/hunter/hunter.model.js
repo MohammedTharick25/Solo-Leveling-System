@@ -23,6 +23,7 @@ const hunterSchema = new mongoose.Schema(
     growthRating: { type: Number, default: 0, min: 0, max: 100 },
     currentStreak: { type: Number, default: 0 },
     longestStreak: { type: Number, default: 0 },
+    streakPausedAt: { type: Date, default: null },
     totalQuestCompletions: { type: Number, default: 0 },
     totalFocusMinutes: { type: Number, default: 0 },
     lastActiveDate: { type: Date, default: Date.now },

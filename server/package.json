@@ -26,7 +26,8 @@
     "multer-storage-cloudinary": "^4.0.0",
     "node-cron": "^3.0.3",
     "react-activity-calendar": "^3.2.1",
-    "socket.io": "^4.6.2"
+    "socket.io": "^4.6.2",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

@@ -1,4 +1,5 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -22,6 +23,9 @@ import {
   Bot,
   CreditCard,
   LockKeyhole,
+  Clock3,
+  ArrowUpRight,
+  Sparkles,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useHunterStore } from "../../stores/hunterStore.js";
@@ -66,6 +70,15 @@ export default function Sidebar({ open, onClose }) {
   });
   const effectiveTier = billingQuery.data?.effectiveTier || "free";
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
   const handleLogout = async () => {
     try {
       await api.post("/auth/logout");
@@ -83,6 +96,7 @@ export default function Sidebar({ open, onClose }) {
         <SidebarContent
           hunter={hunter}
           user={user}
+          billing={billingQuery.data}
           effectiveTier={effectiveTier}
           rankColor={rankColor}
           onLogout={handleLogout}
@@ -91,6 +105,8 @@ export default function Sidebar({ open, onClose }) {
       <AnimatePresence>
         {open && (
           <motion.aside
+            id="mobile-sidebar"
+            aria-label="Mobile navigation"
             initial={{ x: -260 }}
             animate={{ x: 0 }}
             exit={{ x: -260 }}
@@ -99,6 +115,8 @@ export default function Sidebar({ open, onClose }) {
           >
             <button
               onClick={onClose}
+              type="button"
+              aria-label="Close navigation menu"
               className="absolute top-4 right-4 p-1.5 text-slate-500 hover:text-slate-300"
             >
               <X size={18} />
@@ -107,6 +125,7 @@ export default function Sidebar({ open, onClose }) {
             <SidebarContent
               hunter={hunter}
               user={user}
+              billing={billingQuery.data}
               effectiveTier={effectiveTier}
               rankColor={rankColor}
               onLogout={handleLogout}
@@ -120,7 +139,29 @@ export default function Sidebar({ open, onClose }) {
 }
 
 // 2. Update SidebarContent to receive and render the user image
-function SidebarContent({ hunter, user, rankColor, onLogout, onNav, effectiveTier }) {
+function SidebarContent({ hunter, user, billing, rankColor, onLogout, onNav, effectiveTier }) {
+  const tier = billing?.effectiveTier || effectiveTier || "free";
+  const accessEnd = billing?.isTrialing
+    ? billing.trialEndsAt
+    : billing?.upgradeAccessUntil || billing?.currentPeriodEnd;
+  const accessDate = accessEnd
+    ? new Date(accessEnd).toLocaleDateString(undefined, { day: "numeric", month: "short" })
+    : null;
+  const daysRemaining = Number(billing?.daysRemaining || 0);
+  const isPaidTier = tier !== "free";
+  const planCaption = billing?.isTrialing
+    ? `Trial · ${daysRemaining} ${daysRemaining === 1 ? "day" : "days"} left`
+    : isPaidTier
+      ? `${daysRemaining} ${daysRemaining === 1 ? "day" : "days"} left`
+      : billing?.hasChosenPlan
+        ? "Free plan active"
+        : "Choose your plan";
+  const renewalCaption = accessDate
+    ? `${billing?.cancelAtCycleEnd ? "Access until" : billing?.isTrialing ? "Trial ends" : "Next billing"} ${accessDate}`
+    : isPaidTier
+      ? "Plan access is active"
+      : "Core quests, goals and focus";
+
   return (
     <>
       <div className="p-5 border-b border-slate-800/60">
@@ -184,7 +225,7 @@ function SidebarContent({ hunter, user, rankColor, onLogout, onNav, effectiveTie
         </div>
       )}
 
-      <nav className="flex-1 overflow-y-auto no-scrollbar py-3 px-2">
+      <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto no-scrollbar py-3 px-2">
         {NAV_ITEMS.map((item, i) => {
           if (item.divider)
             return <div key={i} className="divider mx-2 my-1" />;
@@ -211,6 +252,39 @@ function SidebarContent({ hunter, user, rankColor, onLogout, onNav, effectiveTie
       </nav>
 
       <div className="p-3 border-t border-slate-800/60">
+        {billing && (
+          <Link
+            to="/billing"
+            onClick={onNav}
+            className={`mb-2 block rounded-xl border p-3 transition-colors ${
+              billing?.isTrialing
+                ? "border-violet-300/20 bg-violet-300/[0.06] hover:bg-violet-300/[0.1]"
+                : isPaidTier
+                  ? "border-cyan-300/15 bg-cyan-300/[0.04] hover:bg-cyan-300/[0.08]"
+                  : "border-white/[0.07] bg-white/[0.025] hover:bg-white/[0.05]"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-2">
+                {billing?.isTrialing ? (
+                  <Sparkles size={14} className="shrink-0 text-violet-200" />
+                ) : isPaidTier ? (
+                  <Clock3 size={14} className="shrink-0 text-cyan-200" />
+                ) : (
+                  <CreditCard size={14} className="shrink-0 text-slate-400" />
+                )}
+                <span className="truncate font-heading text-[11px] font-bold capitalize text-slate-100">
+                  {billing?.isTrialing ? "Monarch trial" : `${tier} plan`}
+                </span>
+              </span>
+              {!isPaidTier && <ArrowUpRight size={13} className="shrink-0 text-cyan-300" />}
+            </div>
+            <p className={`mt-1 pl-[22px] text-[10px] font-semibold ${billing?.isTrialing ? "text-violet-100" : isPaidTier ? "text-cyan-100" : "text-slate-400"}`}>
+              {planCaption}
+            </p>
+            <p className="mt-0.5 pl-[22px] text-[9px] text-slate-500">{renewalCaption}</p>
+          </Link>
+        )}
         <button
           onClick={onLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-heading text-sm text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"

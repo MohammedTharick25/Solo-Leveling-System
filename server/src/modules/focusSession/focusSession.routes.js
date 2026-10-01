@@ -7,6 +7,8 @@ import { computeAndSaveStats } from "../stats/stats.service.js";
 import Quest from "../quest/quest.model.js";
 import { updateQuestProgress } from "../quest/quest.service.js";
 import Goal from "../goals/goal.model.js";
+import * as GuildService from "../guild/guild.service.js";
+import { GuildRepository } from "../guild/guild.repository.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
 import { sendSuccess, asyncHandler } from "../../lib/helpers.js";
 import { Router } from "express";
@@ -18,7 +20,7 @@ import { validate } from "../../middleware/validate.middleware.js";
 
 export const startSession = async (
   userId,
-  { type, plannedDuration, linkedRaidId, linkedQuestId, linkedGoalId, tags },
+  { type, plannedDuration, linkedRaidId, linkedQuestId, linkedGoalId, linkedGuildSprintId, tags },
 ) => {
   let effectiveGoalId = linkedGoalId || null;
   if (linkedQuestId) {
@@ -47,6 +49,15 @@ export const startSession = async (
     if (!linkedGoal) throw new AppError("Linked goal is not active.", 404);
   }
 
+  if (linkedGuildSprintId) {
+    const guild = await GuildRepository.findByMemberUserId(userId);
+    const sprint = guild?.sprints.id(linkedGuildSprintId);
+    const participant = sprint?.participants.find((entry) => entry.userId.toString() === userId.toString());
+    if (!sprint || sprint.status !== "active" || !participant || participant.completedAt || sprint.durationMinutes !== Number(plannedDuration)) {
+      throw new AppError("Join an active guild sprint with a matching focus duration first.", 400);
+    }
+  }
+
   // Auto-close any stuck open session instead of blocking the user
   const existing = await FocusSession.findOne({ userId, endedAt: null });
   if (existing) {
@@ -72,6 +83,7 @@ export const startSession = async (
     linkedRaidId: linkedRaidId || null,
     linkedQuestId: linkedQuestId || null,
     linkedGoalId: effectiveGoalId,
+    linkedGuildSprintId: linkedGuildSprintId || null,
     tags: tags || [],
     startedAt: new Date(),
     pausedDurationSeconds: 0,
@@ -222,6 +234,16 @@ export const endSession = async (
     } catch (error) {
       console.error("[FOCUS] Could not update linked quest progress:", error.message);
     }
+  }
+
+  if (session.completed && actualDuration > 0) {
+    await GuildService.recordGuildFocusSession(
+      userId,
+      session._id,
+      actualDuration,
+      session.linkedGuildSprintId,
+      io,
+    );
   }
 
   try {
