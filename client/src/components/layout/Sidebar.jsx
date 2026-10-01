@@ -21,28 +21,31 @@ import {
   Calendar,
   Bot,
   CreditCard,
+  LockKeyhole,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useHunterStore } from "../../stores/hunterStore.js";
 import { RANK_COLORS } from "../../lib/xpFormulas.js";
 import api from "../../lib/api.js";
+import { hasTierAccess, PREMIUM_FEATURES } from "../../lib/planAccess.js";
 
 const NAV_ITEMS = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Command Center" },
   { to: "/hunter", icon: User, label: "Hunter Profile" },
   { to: "/quests", icon: Scroll, label: "Daily Quests" },
-  { to: "/shadows", icon: Ghost, label: "Shadow Army" },
-  { to: "/bosses", icon: Sword, label: "Boss Battles" },
-  { to: "/dungeons", icon: Castle, label: "Dungeons" },
+  { to: "/shadows", icon: Ghost, label: "Shadow Army", feature: "shadows" },
+  { to: "/bosses", icon: Sword, label: "Boss Battles", feature: "bosses" },
+  { to: "/dungeons", icon: Castle, label: "Dungeons", feature: "dungeons" },
   { divider: true },
   { to: "/focus", icon: Timer, label: "Focus Mode" },
-  { to: "/raids", icon: Target, label: "Task Raids" },
+  { to: "/raids", icon: Target, label: "Task Raids", feature: "raids" },
   { to: "/habits", icon: CheckSquare, label: "Habits" },
   { to: "/calendar", icon: Calendar, label: "Calendar" },
   { to: "/journal", icon: BookOpen, label: "Journal" },
-  { to: "/brain", icon: Brain, label: "Second Brain" },
+  { to: "/brain", icon: Brain, label: "Second Brain", feature: "brain" },
   { divider: true },
-  { to: "/analytics", icon: BarChart3, label: "Analytics" },
-  { to: "/ai-coach", icon: Bot, label: "AI Hunter Coach" },
+  { to: "/analytics", icon: BarChart3, label: "Analytics", feature: "analytics" },
+  { to: "/ai-coach", icon: Bot, label: "AI Hunter Coach", feature: "ai-coach" },
   { to: "/achievements", icon: Trophy, label: "Achievements" },
   { to: "/social", icon: Users, label: "Guild & Social" },
   { to: "/billing", icon: CreditCard, label: "Plans & Billing" },
@@ -53,6 +56,15 @@ export default function Sidebar({ open, onClose }) {
   // 1. Get user from store to access avatar
   const { hunter, user, clearAuth } = useHunterStore();
   const navigate = useNavigate();
+  const billingQuery = useQuery({
+    queryKey: ["billing-me"],
+    queryFn: async () => (await api.get("/billing/me")).data.data,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    enabled: Boolean(useHunterStore.getState().token),
+    retry: 1,
+  });
+  const effectiveTier = billingQuery.data?.effectiveTier || "free";
 
   const handleLogout = async () => {
     try {
@@ -71,6 +83,7 @@ export default function Sidebar({ open, onClose }) {
         <SidebarContent
           hunter={hunter}
           user={user}
+          effectiveTier={effectiveTier}
           rankColor={rankColor}
           onLogout={handleLogout}
         />
@@ -94,6 +107,7 @@ export default function Sidebar({ open, onClose }) {
             <SidebarContent
               hunter={hunter}
               user={user}
+              effectiveTier={effectiveTier}
               rankColor={rankColor}
               onLogout={handleLogout}
               onNav={onClose}
@@ -106,7 +120,7 @@ export default function Sidebar({ open, onClose }) {
 }
 
 // 2. Update SidebarContent to receive and render the user image
-function SidebarContent({ hunter, user, rankColor, onLogout, onNav }) {
+function SidebarContent({ hunter, user, rankColor, onLogout, onNav, effectiveTier }) {
   return (
     <>
       <div className="p-5 border-b border-slate-800/60">
@@ -175,10 +189,13 @@ function SidebarContent({ hunter, user, rankColor, onLogout, onNav }) {
           if (item.divider)
             return <div key={i} className="divider mx-2 my-1" />;
           const Icon = item.icon;
+          const requiredTier = item.feature ? PREMIUM_FEATURES[item.feature]?.requiredTier : null;
+          const locked = requiredTier && !hasTierAccess(effectiveTier, requiredTier);
           return (
             <NavLink
               key={item.to}
-              to={item.to}
+              to={locked ? `/billing?feature=${encodeURIComponent(item.feature)}&required=${requiredTier}` : item.to}
+              state={locked ? { from: item.to } : undefined}
               onClick={onNav}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 transition-all duration-200 font-heading font-medium text-sm tracking-wide
@@ -186,7 +203,8 @@ function SidebarContent({ hunter, user, rankColor, onLogout, onNav }) {
               }
             >
               <Icon size={16} className="shrink-0" />
-              {item.label}
+              <span className="min-w-0 flex-1">{item.label}</span>
+              {locked && <LockKeyhole size={13} aria-label={`${requiredTier} plan feature`} title={`Included in ${requiredTier === "monarch" ? "Monarch" : "Hunter"}`} className="shrink-0 text-amber-300/80" />}
             </NavLink>
           );
         })}

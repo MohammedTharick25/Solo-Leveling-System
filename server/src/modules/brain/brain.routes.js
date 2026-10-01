@@ -5,6 +5,7 @@ import { Router } from "express";
 import { protect, requireAwakened } from "../../middleware/auth.middleware.js";
 import { body } from "express-validator";
 import { validate } from "../../middleware/validate.middleware.js";
+import { requirePlan } from "../../middleware/requirePlan.middleware.js";
 
 // ── Service ──────────────────────────────────────────────────────────────────
 
@@ -162,7 +163,7 @@ const createValidators = [
 ];
 
 const router = Router();
-router.use(protect, requireAwakened);
+router.use(protect, requireAwakened, requirePlan("monarch"));
 
 router.get(
   "/search",

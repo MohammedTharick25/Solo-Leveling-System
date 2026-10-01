@@ -4,10 +4,13 @@ import { protect } from "../../middleware/auth.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import {
   cancelSubscription,
+  chooseFreePlan,
   createSubscription,
   getBillingStatus,
   getPlans,
   handleWebhook,
+  startFreeTrial,
+  upgradeToMonarch,
   verifyCheckout,
 } from "./billing.controller.js";
 
@@ -17,6 +20,9 @@ router.post("/webhook", handleWebhook);
 router.use(protect);
 router.get("/plans", getPlans);
 router.get("/me", getBillingStatus);
+router.post("/trial", startFreeTrial);
+router.post("/free", chooseFreePlan);
+router.post("/upgrade", upgradeToMonarch);
 router.post(
   "/subscriptions",
   [body("tier").isIn(["hunter", "monarch"]).withMessage("Choose a paid plan."), validate],

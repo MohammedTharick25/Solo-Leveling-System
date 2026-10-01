@@ -2,6 +2,7 @@ import * as bossService from "./boss.service.js";
 import { sendSuccess, asyncHandler } from "../../lib/helpers.js";
 import { Router } from "express";
 import { protect, requireAwakened } from "../../middleware/auth.middleware.js";
+import { requirePlan } from "../../middleware/requirePlan.middleware.js";
 
 export const getActiveBoss = asyncHandler(async (req, res) => {
   const boss = await bossService.getActiveBoss(req.userId);
@@ -32,6 +33,7 @@ const router = Router();
 router.use(protect, requireAwakened);
 
 router.get("/active", getActiveBoss);
+router.use(requirePlan("hunter"));
 router.get("/defeated", getDefeated);
 router.patch("/:bossId/challenges/:challengeId/complete", completeChallenge);
 

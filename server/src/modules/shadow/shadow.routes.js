@@ -2,6 +2,7 @@ import * as shadowService from "./shadow.service.js";
 import { sendSuccess, asyncHandler } from "../../lib/helpers.js";
 import { Router } from "express";
 import { protect, requireAwakened } from "../../middleware/auth.middleware.js";
+import { requirePlan } from "../../middleware/requirePlan.middleware.js";
 
 // Controller
 export const getShadows = asyncHandler(async (req, res) => {
@@ -23,7 +24,7 @@ export const triggerEvolutionCheck = asyncHandler(async (req, res) => {
 
 // Routes
 const router = Router();
-router.use(protect, requireAwakened);
+router.use(protect, requireAwakened, requirePlan("monarch"));
 
 router.get("/", getShadows);
 router.get("/:id", getShadow);

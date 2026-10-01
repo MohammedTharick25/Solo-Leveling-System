@@ -16,6 +16,7 @@ import {
 import { Router } from "express";
 import { protect, requireAwakened } from "../../middleware/auth.middleware.js";
 import { projectFutureSelf } from "../../lib/xpFormulas.js";
+import { requirePlan } from "../../middleware/requirePlan.middleware.js";
 
 // ── Service ──────────────────────────────────────────────────────────────────
 
@@ -238,7 +239,7 @@ export const getPredictions = async (userId) => {
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 const router = Router();
-router.use(protect, requireAwakened);
+router.use(protect, requireAwakened, requirePlan("hunter"));
 
 router.get(
   "/dashboard",

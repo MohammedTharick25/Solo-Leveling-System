@@ -7,15 +7,26 @@ const PLAN_DEFINITIONS = {
   hunter: {
     id: "hunter",
     name: "Hunter",
-    description: "More room for AI coaching and deeper progress insights.",
-    features: ["Higher AI coach allowance", "Advanced reports", "Expanded personalization"],
+    description: "Advanced insight and challenge tools for consistent progress.",
+    features: [
+      "Everything in Free",
+      "Advanced analytics and progress insights",
+      "AI Hunter Coach",
+      "Boss Battles",
+    ],
     razorpayPlanId: () => config.RAZORPAY_HUNTER_PLAN_ID,
   },
   monarch: {
     id: "monarch",
     name: "Monarch",
     description: "The complete personal growth system for committed hunters.",
-    features: ["Highest AI coach allowance", "All advanced insights", "Priority personalization"],
+    features: [
+      "Everything in Hunter",
+      "Second Brain and knowledge graph",
+      "Shadow Army",
+      "Dungeons",
+      "Task Raids",
+    ],
     razorpayPlanId: () => config.RAZORPAY_MONARCH_PLAN_ID,
   },
 };
@@ -94,7 +105,7 @@ export const getPlans = async () => {
         id: "free",
         name: "Free",
         description: "Build a steady personal growth routine.",
-        features: ["Core goals, quests and habits", "Focus sessions", "Progress history"],
+        features: ["Daily quests", "Goals and milestones", "Habits and streaks", "Focus sessions", "Journal and calendar", "Achievements and core progress"],
         available: true,
         billing: { amount: 0, currency: "INR", interval: null, intervalCount: 1 },
       },
@@ -112,6 +123,7 @@ const getEffectiveTier = (billing) => {
   ) {
     return billing.tier;
   }
+  if (billing?.trialEndsAt && billing.trialEndsAt.getTime() > Date.now()) return "monarch";
   return "free";
 };
 
@@ -136,9 +148,23 @@ export const getBillingStatus = async (userId) => {
   return toBillingStatus(user, billing);
 };
 
-const toBillingStatus = (user, billing = {}) => ({
+const toBillingStatus = (user, billing = {}) => {
+  const effectiveTier = getEffectiveTier(billing);
+  const activePaidPlan = billing.provider === "razorpay" && billing.status === "active" &&
+    (!billing.currentPeriodEnd || billing.currentPeriodEnd.getTime() > Date.now());
+  const isTrialing = Boolean(!activePaidPlan && billing.trialEndsAt && billing.trialEndsAt.getTime() > Date.now());
+  const accessEnd = isTrialing ? billing.trialEndsAt : billing.currentPeriodEnd;
+  return {
   tier: billing.tier || "free",
-  effectiveTier: getEffectiveTier(billing),
+  effectiveTier,
+  isTrialing,
+  trialStartedAt: billing.trialStartedAt || null,
+  trialEndsAt: billing.trialEndsAt || null,
+  trialUsed: Boolean(billing.trialUsedAt),
+  hasChosenPlan: Boolean(billing.planChosenAt || getEffectiveTier(billing) !== "free"),
+  daysRemaining: accessEnd && effectiveTier !== "free"
+    ? Math.max(0, Math.ceil((accessEnd.getTime() - Date.now()) / 86400000))
+      : 0,
   status: billing.status || "inactive",
   provider: billing.provider || null,
   currentPeriodEnd: billing.currentPeriodEnd || null,
@@ -146,7 +172,74 @@ const toBillingStatus = (user, billing = {}) => ({
   subscriptionId: billing.razorpaySubscriptionId || null,
   email: user.email,
   keyId: config.RAZORPAY_KEY_ID || null,
-});
+  };
+};
+
+export const startFreeTrial = async (userId) => {
+  const now = new Date();
+  const end = new Date(now.getTime() + 14 * 86400000);
+  const result = await User.updateOne(
+    {
+      _id: userId,
+      "billing.trialUsedAt": null,
+      "billing.lastPaymentId": null,
+      $or: [
+        { "billing.razorpaySubscriptionId": null },
+        { "billing.status": { $in: ["inactive", "cancelled", "completed", "expired"] } },
+      ],
+    },
+    { $set: { "billing.trialStartedAt": now, "billing.trialEndsAt": end, "billing.trialUsedAt": now, "billing.planChosenAt": now } },
+  );
+  if (!result.modifiedCount) {
+    throw new AppError("Your free trial has already been used or a subscription is already in progress.", 409);
+  }
+  return getBillingStatus(userId);
+};
+
+export const chooseFreePlan = async (userId) => {
+  const user = await User.findById(userId).select("billing");
+  if (!user) throw new AppError("User not found.", 404);
+  if (getEffectiveTier(user.billing) !== "free") {
+    throw new AppError("Your current trial or paid plan is still active.", 409);
+  }
+  if (
+    user.billing?.razorpaySubscriptionId &&
+    !["inactive", "cancelled", "completed", "expired"].includes(user.billing.status)
+  ) {
+    throw new AppError("Finish or cancel the pending subscription before continuing on Free.", 409);
+  }
+  await User.updateOne({ _id: userId }, { $set: { "billing.planChosenAt": new Date() } });
+  return getBillingStatus(userId);
+};
+
+export const upgradeToMonarch = async (userId) => {
+  const user = await User.findById(userId).select("billing");
+  const billing = user?.billing || {};
+  if (!user || billing.tier !== "hunter" || billing.status !== "active" || !billing.razorpaySubscriptionId) {
+    throw new AppError("Only an active Hunter subscription can be upgraded to Monarch.", 409);
+  }
+  if (billing.cancelAtCycleEnd) {
+    throw new AppError("Resume your scheduled cancellation before upgrading.", 409);
+  }
+  const planId = PLAN_DEFINITIONS.monarch.razorpayPlanId();
+  if (!planId) throw new AppError("Monarch is not configured in Razorpay yet.", 503);
+  const claim = await User.updateOne(
+    { _id: userId, "billing.tier": "hunter", "billing.status": "active", "billing.upgradePending": { $ne: true }, "billing.cancelAtCycleEnd": { $ne: true } },
+    { $set: { "billing.upgradePending": true } },
+  );
+  if (!claim.modifiedCount) throw new AppError("Your plan is already changing. Refresh billing and try again.", 409);
+  try {
+    const subscription = await razorpayRequest(`/subscriptions/${encodeURIComponent(billing.razorpaySubscriptionId)}`, {
+      method: "PATCH",
+      body: { plan_id: planId, schedule_change_at: "now", customer_notify: true },
+    });
+    await applyProviderSubscription(subscription, userId);
+    await User.updateOne({ _id: userId }, { $set: { "billing.tier": "monarch", "billing.razorpayPlanId": planId } });
+    return getBillingStatus(userId);
+  } finally {
+    await User.updateOne({ _id: userId }, { $set: { "billing.upgradePending": false } });
+  }
+};
 
 export const createSubscription = async (userId, tier) => {
   assertRazorpayConfigured();
@@ -179,7 +272,14 @@ export const createSubscription = async (userId, tier) => {
     },
   });
 
+  const trialHistory = {
+    trialStartedAt: previousBilling.trialStartedAt || null,
+    trialEndsAt: previousBilling.trialEndsAt || null,
+    trialUsedAt: previousBilling.trialUsedAt || null,
+    planChosenAt: previousBilling.planChosenAt || new Date(),
+  };
   user.billing = {
+    ...trialHistory,
     tier,
     status: subscription.status || "created",
     provider: "razorpay",
@@ -285,6 +385,11 @@ const applyProviderSubscription = async (subscription, userId = null) => {
       ? new Date(subscription.current_end * 1000)
       : undefined,
   };
+  if (subscription.plan_id) {
+    update["billing.razorpayPlanId"] = subscription.plan_id;
+    if (subscription.plan_id === PLAN_DEFINITIONS.monarch.razorpayPlanId()) update["billing.tier"] = "monarch";
+    if (subscription.plan_id === PLAN_DEFINITIONS.hunter.razorpayPlanId()) update["billing.tier"] = "hunter";
+  }
   if (terminal) update["billing.tier"] = "free";
   return User.updateOne(
     {

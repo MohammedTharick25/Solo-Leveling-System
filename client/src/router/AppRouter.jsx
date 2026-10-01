@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useHunterStore } from '../stores/hunterStore.js';
+import api from '../lib/api.js';
 import AppShell from '../components/layout/AppShell.jsx';
 import { PageLoader } from '../components/ui/PageLoader.jsx';
 import ErrorBoundary from '../components/ui/ErrorBoundary.jsx';
@@ -10,6 +12,7 @@ import AwakeningPage from '../modules/auth/AwakeningPage.jsx';
 import ForgotPasswordPage from '../modules/auth/ForgotPasswordPage.jsx';
 import ResetPasswordPage from '../modules/auth/ResetPasswordPage.jsx';
 import LandingPage from '../modules/landing/LandingPage.jsx';
+import PlanGate from '../components/billing/PlanGate.jsx';
 
 const DashboardPage       = lazy(() => import('../modules/dashboard/DashboardPage.jsx'));
 const HunterPage          = lazy(() => import('../modules/hunter/HunterPage.jsx'));
@@ -31,11 +34,26 @@ const SettingsPage         = lazy(() => import('../modules/settings/SettingsPage
 const AICoachPage           = lazy(() => import('../modules/ai/AICoachPage.jsx'));
 const GoalsPage              = lazy(() => import('../modules/goals/GoalsPage.jsx'));
 const BillingPage            = lazy(() => import('../modules/billing/BillingPage.jsx'));
+const NotFoundPage           = lazy(() => import('../modules/system/NotFoundPage.jsx'));
+const RestrictedPage         = lazy(() => import('../modules/system/RestrictedPage.jsx'));
 
 const ProtectedRoute = ({ children }) => {
   const { token, user } = useHunterStore();
+  const location = useLocation();
+  const billingQuery = useQuery({
+    queryKey: ['billing-me'],
+    queryFn: async () => (await api.get('/billing/me')).data.data,
+    enabled: Boolean(token),
+    staleTime: 30_000,
+    retry: 1,
+  });
   if (!token) return <Navigate to="/login" replace />;
   if (token && user && !user.isAwakened) return <Navigate to="/awakening" replace />;
+  if (location.pathname === '/billing' || location.pathname === '/restricted') return children;
+  if (billingQuery.isLoading) return <PageLoader />;
+  if (billingQuery.isError || !billingQuery.data?.hasChosenPlan) {
+    return <Navigate to="/billing" replace state={{ from: location.pathname }} />;
+  }
   return children;
 };
 
@@ -69,25 +87,27 @@ export default function AppRouter() {
         <Route path="dashboard" element={<Wrap><DashboardPage /></Wrap>} />
         <Route path="hunter" element={<Wrap><HunterPage /></Wrap>} />
         <Route path="quests" element={<Wrap><QuestsPage /></Wrap>} />
-        <Route path="shadows" element={<Wrap><ShadowsPage /></Wrap>} />
-        <Route path="bosses" element={<Wrap><BossesPage /></Wrap>} />
-        <Route path="dungeons" element={<Wrap><DungeonsPage /></Wrap>} />
+        <Route path="shadows" element={<PlanGate feature="shadows"><Wrap><ShadowsPage /></Wrap></PlanGate>} />
+        <Route path="bosses" element={<PlanGate feature="bosses"><Wrap><BossesPage /></Wrap></PlanGate>} />
+        <Route path="dungeons" element={<PlanGate feature="dungeons"><Wrap><DungeonsPage /></Wrap></PlanGate>} />
         <Route path="focus" element={<Wrap><PomodoroPage /></Wrap>} />
-        <Route path="raids" element={<Wrap><RaidsPage /></Wrap>} />
+        <Route path="raids" element={<PlanGate feature="raids"><Wrap><RaidsPage /></Wrap></PlanGate>} />
         <Route path="habits" element={<Wrap><HabitsPage /></Wrap>} />
         <Route path="journal" element={<Wrap><JournalPage /></Wrap>} />
-        <Route path="brain" element={<Wrap><BrainPage /></Wrap>} />
-        <Route path="analytics" element={<Wrap><AnalyticsPage /></Wrap>} />
+        <Route path="brain" element={<PlanGate feature="brain"><Wrap><BrainPage /></Wrap></PlanGate>} />
+        <Route path="analytics" element={<PlanGate feature="analytics"><Wrap><AnalyticsPage /></Wrap></PlanGate>} />
         <Route path="achievements" element={<Wrap><AchievementsPage /></Wrap>} />
         <Route path="social" element={<Wrap><SocialPage /></Wrap>} />
         <Route path="calendar" element={<Wrap><CalendarPage /></Wrap>} />
         <Route path="settings" element={<Wrap><SettingsPage /></Wrap>} />
-        <Route path="ai-coach" element={<Wrap><AICoachPage /></Wrap>} />
+        <Route path="ai-coach" element={<PlanGate feature="ai-coach"><Wrap><AICoachPage /></Wrap></PlanGate>} />
         <Route path="goals" element={<Wrap><GoalsPage /></Wrap>} />
         <Route path="billing" element={<Wrap><BillingPage /></Wrap>} />
+        <Route path="restricted" element={<Wrap><RestrictedPage /></Wrap>} />
+        <Route path="*" element={<Wrap><NotFoundPage /></Wrap>} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Wrap><NotFoundPage /></Wrap>} />
     </Routes>
   );
 }

@@ -53,6 +53,26 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config;
 
+    if (
+      error.response?.status === 403 &&
+      !String(original?.url || "").includes("/billing") &&
+      window.location.pathname !== "/restricted"
+    ) {
+      const messageText = error.response?.data?.message || "You do not have access to this area.";
+      if (/plan/i.test(messageText)) {
+        const endpoint = String(original?.url || "");
+        const routeFeature = [
+          ["analytics", "analytics"], ["ai", "ai-coach"], ["brain", "brain"],
+          ["shadow", "shadows"], ["boss", "bosses"], ["dungeon", "dungeons"], ["raids", "raids"],
+        ].find(([route]) => endpoint.includes(`/${route}`))?.[1];
+        const required = /monarch/i.test(messageText) ? "monarch" : "hunter";
+        const featureQuery = routeFeature ? `&feature=${encodeURIComponent(routeFeature)}&required=${required}` : "";
+        window.location.assign(`/billing?required=${required}${featureQuery}`);
+      } else {
+        window.location.assign(`/restricted?message=${encodeURIComponent(messageText)}`);
+      }
+    }
+
     if (error.response?.status === 401 && !original._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {

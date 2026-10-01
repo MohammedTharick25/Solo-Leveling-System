@@ -29,6 +29,18 @@ export const cancelSubscription = asyncHandler(async (req, res) => {
   sendSuccess(res, { billing }, "Subscription cancellation scheduled.");
 });
 
+export const startFreeTrial = asyncHandler(async (req, res) => {
+  sendSuccess(res, { billing: await billingService.startFreeTrial(req.userId) }, "14-day Monarch trial started.", 201);
+});
+
+export const chooseFreePlan = asyncHandler(async (req, res) => {
+  sendSuccess(res, { billing: await billingService.chooseFreePlan(req.userId) }, "Free plan selected.");
+});
+
+export const upgradeToMonarch = asyncHandler(async (req, res) => {
+  sendSuccess(res, { billing: await billingService.upgradeToMonarch(req.userId) }, "Subscription upgraded to Monarch.");
+});
+
 export const handleWebhook = asyncHandler(async (req, res) => {
   if (!billingService.verifyWebhookSignature(req.rawBody, req.get("x-razorpay-signature"))) {
     throw new AppError("Invalid Razorpay webhook signature.", 400);

@@ -62,6 +62,11 @@ const userSchema = new mongoose.Schema(
     bio: { type: String, default: "", trim: true, maxlength: 240 },
     billing: {
       tier: { type: String, enum: ["free", "hunter", "monarch"], default: "free" },
+      trialStartedAt: { type: Date, default: null },
+      trialEndsAt: { type: Date, default: null },
+      trialUsedAt: { type: Date, default: null },
+      planChosenAt: { type: Date, default: null },
+      upgradePending: { type: Boolean, default: false },
       status: {
         type: String,
         enum: ["inactive", "created", "authenticated", "active", "pending", "halted", "cancelled", "completed", "expired"],

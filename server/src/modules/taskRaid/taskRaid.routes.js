@@ -11,6 +11,7 @@ import { Router } from "express";
 import { protect, requireAwakened } from "../../middleware/auth.middleware.js";
 import { body } from "express-validator";
 import { validate } from "../../middleware/validate.middleware.js";
+import { requirePlan } from "../../middleware/requirePlan.middleware.js";
 
 const DIFFICULTY_XP = { F: 20, E: 40, D: 75, C: 120, B: 200, A: 320, S: 500 };
 
@@ -190,7 +191,7 @@ const createValidators = [
 ];
 
 const router = Router();
-router.use(protect, requireAwakened);
+router.use(protect, requireAwakened, requirePlan("monarch"));
 
 router.get(
   "/",
