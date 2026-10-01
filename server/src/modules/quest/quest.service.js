@@ -1,4 +1,5 @@
 import Quest from "./quest.model.js";
+import Goal from "../goals/goal.model.js";
 import Hunter from "../hunter/hunter.model.js";
 import User from "../user/user.model.js";
 import Stats from "../stats/stats.model.js";
@@ -502,6 +503,75 @@ export const updateQuestProgress = async (
   return { quest, autoCompleted: false };
 };
 
+const syncGoalProgressFromQuest = async (quest, userId) => {
+  if (!quest.goalId || !quest.goalQuestId) return null;
+
+  const goal = await Goal.findOne({ _id: quest.goalId, userId }).lean();
+  if (!goal) return null;
+
+  const linkedQuests = await Quest.find({
+    userId,
+    goalId: goal._id,
+  }).select("goalQuestId status").lean();
+
+  const completedIds = new Set(
+    linkedQuests
+      .filter((item) => item.status === "completed")
+      .map((item) => String(item.goalQuestId)),
+  );
+
+  const allGoalQuests = (goal.milestones || []).flatMap((milestone) => milestone.quests || []);
+  const total = allGoalQuests.length;
+  const completed = allGoalQuests.filter((item) => completedIds.has(String(item._id))).length;
+  const progress = total ? Math.round((completed / total) * 100) : 0;
+  const goalCompleted = total > 0 && completed === total;
+
+  let previousCompleted = true;
+  const milestones = (goal.milestones || []).map((milestone) => {
+    const quests = milestone.quests || [];
+    const milestoneCompleted = quests.length > 0 && quests.every((item) => completedIds.has(String(item._id)));
+    const status = milestoneCompleted
+      ? "completed"
+      : previousCompleted
+        ? "active"
+        : "locked";
+
+    previousCompleted = milestoneCompleted;
+
+    return {
+      _id: milestone._id,
+      status,
+    };
+  });
+
+  await Goal.updateOne(
+    { _id: goal._id, userId },
+    {
+      $set: {
+        progress,
+        // Quest progress must not resume a goal the user explicitly paused.
+        status: goalCompleted
+          ? "completed"
+          : goal.status === "paused"
+            ? "paused"
+            : "active",
+      },
+    },
+  );
+
+  // Persist milestone statuses individually so the Goals page can render them directly.
+  await Promise.all(
+    milestones.map((milestone) =>
+      Goal.updateOne(
+        { _id: goal._id, userId, "milestones._id": milestone._id },
+        { $set: { "milestones.$.status": milestone.status } },
+      ),
+    ),
+  );
+
+  return { progress, completed, total, goalCompleted };
+};
+
 export const completeQuest = async (questId, userId, io = null) => {
   const quest = await Quest.findOneAndUpdate(
     { _id: questId, userId, status: "active" },
@@ -510,13 +580,16 @@ export const completeQuest = async (questId, userId, io = null) => {
   );
   if (!quest) throw new AppError("Quest not found or already finished.", 404);
 
-  await Promise.all([
+  const [xpResult] = await Promise.all([
     awardXP(userId, quest.xpReward, io),
     awardStatGains(userId, quest.statRewards),
     Hunter.findOneAndUpdate({ userId }, { $inc: { totalQuestCompletions: 1 } }),
   ]);
+  quest.earnedXP = xpResult.xpEarned;
+  await quest.save();
 
   await updateStreakOnQuestComplete(userId, io);
+  const goalProgress = await syncGoalProgressFromQuest(quest, userId);
   await checkShadowUnlocks(userId, io);
   await checkBossSpawn(userId, io);
   await checkAndAwardAchievements(userId, io);
@@ -547,7 +620,7 @@ export const completeQuest = async (questId, userId, io = null) => {
     );
   }
 
-  return { quest, allDone, total, completed };
+  return { quest, allDone, total, completed, goalProgress };
 };
 
 export const failQuest = async (questId, userId) => {

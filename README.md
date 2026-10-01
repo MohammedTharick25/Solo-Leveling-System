@@ -24,10 +24,17 @@ Instead of treating productivity as a simple checklist, the application turns ev
 - Build a personal knowledge system
 - Share a public Hunter profile
 - Manage account, privacy, notifications, sessions, and exports
+- Manage recurring Hunter and Monarch subscriptions through Razorpay
 
 The goal is simple:
 
 > **Make consistent self-improvement feel like leveling up in a game.**
+
+---
+
+## Razorpay billing setup
+
+See [docs/BILLING_SETUP.md](docs/BILLING_SETUP.md) for test mode setup, Razorpay plan configuration, webhook events, and environment variables.
 
 ---
 

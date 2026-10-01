@@ -28,6 +28,7 @@ import { useAudio } from "../../hooks/useAudio.js";
 import { pageVariants } from "../../lib/animations.js";
 import { EmptyState, DiffBadge, Button } from "../../components/ui/PageLoader.jsx";
 import { useHunterStore } from "../../stores/hunterStore.js";
+import { syncProgressionQueries } from "../../lib/systemSync.js";
 
 const CATEGORY_CONFIG = {
   focus: { icon: Target, color: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/25", bar: "bg-cyan-400" },
@@ -78,9 +79,7 @@ export default function QuestsPage() {
     mutationFn: (id) => api.patch(`/quests/${id}/complete`),
     onSuccess: (res) => {
       playQuestComplete();
-      queryClient.invalidateQueries({ queryKey: ["quests"] });
-      queryClient.invalidateQueries({ queryKey: ["hunter"] });
-      if (res.data.data.allDone) queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      syncProgressionQueries(queryClient);
     },
   });
 
@@ -88,8 +87,7 @@ export default function QuestsPage() {
     mutationFn: ({ id, value }) => api.patch(`/quests/${id}/progress`, { value }),
     onSuccess: (res) => {
       if (res.data.data.autoCompleted) playQuestComplete();
-      queryClient.invalidateQueries({ queryKey: ["quests"] });
-      queryClient.invalidateQueries({ queryKey: ["hunter"] });
+      syncProgressionQueries(queryClient);
     },
   });
 
@@ -129,13 +127,13 @@ export default function QuestsPage() {
               </div>
               <h2 className="font-heading font-black text-xl text-white">Your Daily Quests</h2>
             </div>
-            <div className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-950/60 p-1">
+            <div className="grid grid-cols-3 items-center gap-1 rounded-2xl border border-white/5 bg-slate-950/70 p-1 w-full sm:w-auto">
               {FILTERS.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setFilter(item.id)}
-                  className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${filter === item.id ? "bg-white/10 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"}`}
+                  className={`px-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all duration-300 ${filter === item.id ? "bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/10" : "text-slate-500 hover:text-slate-200 hover:bg-white/5"}`}
                 >
                   {item.label}
                 </button>
@@ -155,7 +153,15 @@ export default function QuestsPage() {
           ) : visibleQuests.length === 0 ? (
             <EmptyState icon={CheckCircle2} title="Nothing Here" description={`There are no ${filter === "active" ? "active" : "completed"} quests right now.`} />
           ) : (
-            <motion.div layout className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+            <>
+              <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <BoardMetric label="Active" value={activeQuests.length} icon={CircleDot} />
+                <BoardMetric label="Cleared" value={completedQuests.length} icon={CheckCircle2} />
+                <BoardMetric label="Remaining XP" value={Math.max(totalXp - earnedXp, 0)} icon={Zap} />
+                <BoardMetric label="Completion" value={`${progressPercent}%`} icon={Gauge} />
+              </div>
+
+              <motion.div layout className="grid grid-cols-1 xl:grid-cols-2 gap-5">
               <AnimatePresence mode="popLayout">
                 {visibleQuests.map((quest, index) => (
                   <QuestCard
@@ -169,7 +175,8 @@ export default function QuestsPage() {
                   />
                 ))}
               </AnimatePresence>
-            </motion.div>
+              </motion.div>
+            </>
           )}
         </>
       ) : historyLoading ? (
@@ -183,10 +190,10 @@ export default function QuestsPage() {
 
 function QuestHero({ completed, total, progressPercent, streak, allDone, totalXp, earnedXp }) {
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-slate-800/80 bg-gradient-to-br from-slate-950 via-slate-900/90 to-cyan-950/20 p-5 sm:p-7 mb-7 shadow-2xl shadow-black/20">
+    <section className="relative overflow-hidden rounded-[30px] border border-cyan-400/10 bg-slate-950/80 p-5 sm:p-7 lg:p-8 mb-7 shadow-[0_24px_80px_rgba(0,0,0,.35)] backdrop-blur-xl">
       <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(circle_at_85%_20%,rgba(34,211,238,0.14),transparent_30%),radial-gradient(circle_at_10%_100%,rgba(168,85,247,0.10),transparent_30%)]" />
       <div className="absolute right-8 top-8 h-28 w-28 rounded-full border border-cyan-400/10 animate-pulse" />
-      <div className="absolute right-14 top-14 h-16 w-16 rounded-full border border-cyan-400/10" />
+      <motion.div animate={{ rotate: 360 }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} className="absolute right-14 top-14 h-20 w-20 rounded-full border border-dashed border-violet-400/15" />
 
       <div className="relative grid lg:grid-cols-[1fr_auto] gap-7 items-center">
         <div>
@@ -291,14 +298,14 @@ function QuestCard({ quest, index, onComplete, onProgress, completing, completed
       exit={{ opacity: 0, scale: 0.96, y: -8 }}
       whileHover={!completed ? { y: -4 } : undefined}
       transition={{ duration: 0.35, delay: Math.min(index * 0.05, 0.25) }}
-      className={`group relative overflow-hidden rounded-2xl border bg-slate-950/70 transition-all duration-300 ${completed ? "border-emerald-500/20" : `${cfg.border} hover:border-white/15 hover:bg-slate-900/80`}`}
+      className={`group relative overflow-hidden rounded-[24px] border bg-slate-950/70 transition-all duration-300 shadow-xl shadow-black/10 ${completed ? "border-emerald-500/20 bg-emerald-950/[0.08]" : `${cfg.border} hover:-translate-y-1 hover:border-white/15 hover:bg-slate-900/80 hover:shadow-cyan-500/[0.04]`}`}
     >
       <div className={`absolute left-0 top-0 bottom-0 w-1 ${completed ? "bg-emerald-400" : cfg.bar}`} />
       <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-cyan-400/[0.025] blur-2xl pointer-events-none" />
 
       <div className="p-5 sm:p-6">
         <div className="flex items-start gap-4">
-          <div className={`relative shrink-0 flex h-11 w-11 items-center justify-center rounded-xl border ${cfg.bg} ${cfg.border} ${cfg.color}`}>
+          <div className={`relative shrink-0 flex h-12 w-12 items-center justify-center rounded-2xl border ${cfg.bg} ${cfg.border} ${cfg.color} shadow-inner`}>
             <Icon size={19} />
             <span className="absolute -bottom-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full border border-slate-950 bg-slate-800 text-[8px] font-black text-slate-400 flex items-center justify-center">
               {String(index + 1).padStart(2, "0")}
@@ -328,7 +335,7 @@ function QuestCard({ quest, index, onComplete, onProgress, completing, completed
           </div>
         </div>
 
-        <div className="mt-5 rounded-xl border border-white/5 bg-white/[0.025] p-4">
+        <div className="mt-5 rounded-2xl border border-white/5 bg-white/[0.025] p-4 sm:p-5">
           <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-600 mb-1.5">What to do</p>
           <p className="text-sm leading-6 text-slate-300 break-user-content">{quest.description}</p>
         </div>
@@ -366,12 +373,12 @@ function QuestCard({ quest, index, onComplete, onProgress, completing, completed
             <span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-600">Mission progress</span>
             <span className="font-display text-[10px] font-black text-slate-300">{Math.round(progress)}%</span>
           </div>
-          <div className="h-2 rounded-full bg-black/60 border border-white/5 overflow-hidden">
+          <div className="h-2.5 rounded-full bg-black/60 border border-white/5 overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
               transition={{ duration: 0.7, ease: "easeOut" }}
-              className={`h-full rounded-full ${completed ? "bg-emerald-400" : cfg.bar}`}
+              className={`h-full rounded-full shadow-[0_0_12px_rgba(34,211,238,.18)] ${completed ? "bg-emerald-400" : cfg.bar}`}
             />
           </div>
         </div>
@@ -430,6 +437,18 @@ function InfoPill({ label, value, icon: Icon }) {
       </div>
       <p className="mt-1 truncate text-[10px] font-bold text-slate-300" title={String(value)}>{value}</p>
     </div>
+  );
+}
+
+function BoardMetric({ label, value, icon: Icon }) {
+  return (
+    <motion.div whileHover={{ y: -2 }} className="rounded-2xl border border-white/5 bg-slate-950/55 p-3.5 sm:p-4 backdrop-blur-xl">
+      <div className="mb-3 flex items-center gap-2 text-cyan-400">
+        <span className="rounded-lg border border-cyan-400/10 bg-cyan-400/5 p-1.5"><Icon size={13} /></span>
+        <span className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">{label}</span>
+      </div>
+      <p className="font-display text-lg font-black text-white sm:text-xl">{value}</p>
+    </motion.div>
   );
 }
 

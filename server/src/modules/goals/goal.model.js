@@ -37,6 +37,7 @@ const goalSchema = new mongoose.Schema(
     targetDate: { type: Date, default: null },
     status: { type: String, enum: ["active", "completed", "paused"], default: "active" },
     progress: { type: Number, default: 0, min: 0, max: 100 },
+    focusMinutes: { type: Number, default: 0, min: 0 },
     whyItMatters: { type: String, default: "" },
     milestones: { type: [milestoneSchema], default: [] },
     aiGenerated: { type: Boolean, default: false },

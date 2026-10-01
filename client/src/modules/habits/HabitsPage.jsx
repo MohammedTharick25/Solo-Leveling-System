@@ -9,9 +9,14 @@ import {
   Trash2,
   RotateCcw,
   Target,
+  Gauge,
+  Sparkles,
+  Zap,
+  TrendingUp,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import api from "../../lib/api.js";
+import { syncProgressionQueries } from "../../lib/systemSync.js";
 import { useAudio } from "../../hooks/useAudio.js";
 import {
   pageVariants,
@@ -120,17 +125,14 @@ export default function HabitsPage() {
     mutationFn: (id) => api.post(`/habits/${id}/complete`),
     onSuccess: () => {
       playQuestComplete();
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-      queryClient.invalidateQueries({ queryKey: ["habit-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["hunter"] });
+      syncProgressionQueries(queryClient);
     },
   });
 
   const uncompleteMutation = useMutation({
     mutationFn: (id) => api.delete(`/habits/${id}/complete`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["habits"] });
-      queryClient.invalidateQueries({ queryKey: ["habit-stats"] });
+      syncProgressionQueries(queryClient);
     },
   });
 
@@ -169,9 +171,12 @@ export default function HabitsPage() {
       animate="animate"
       exit="exit"
     >
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-        <div>
-          <p className="text-system mb-1">Daily Protocol</p>
+      <div className="relative mb-7 flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-[30px] border border-cyan-400/10 bg-slate-950/75 p-5 shadow-2xl backdrop-blur-xl sm:p-7">
+        <div className="relative">
+          <div className="mb-2 flex items-center gap-2">
+            <Sparkles size={13} className="text-cyan-400" />
+            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-cyan-400">Daily Protocol</p>
+          </div>
           <h1 className="font-heading font-bold text-2xl text-slate-100">
             Habit Tracker
           </h1>
@@ -179,7 +184,7 @@ export default function HabitsPage() {
             Small daily actions compound into extraordinary results.
           </p>
         </div>
-        <Button variant="primary" onClick={() => setCreateModal(true)}>
+        <Button variant="primary" onClick={() => setCreateModal(true)} className="relative z-10">
           <Plus size={14} /> New Habit
         </Button>
       </div>
@@ -215,70 +220,22 @@ export default function HabitsPage() {
                   className="h-full rounded-full bg-cyan-400"
                 />
               </div>
-              <p className="text-[10px] text-slate-500 mt-2">Complete every due habit to keep today's momentum alive.</p>
+              <p className="text-[10px] text-slate-500 mt-2">{dueToday.length === 0 ? "No habits are scheduled today. A rest day supports consistency." : stats.completedToday >= dueToday.length ? "Daily habits complete. Great work. Take time to recharge." : "Every small step counts. Choose one habit that feels manageable."}</p>
             </div>
           </div>
         </motion.div>
       )}
 
-      {/* Momentum panel */}
-      {stats && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass rounded-2xl p-4 sm:p-5 mb-4 border-cyan-500/15 overflow-hidden relative"
-        >
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.10),transparent_45%)]" />
-          <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-system">Today's Momentum</p>
-              <p className="font-heading font-bold text-slate-100 mt-1">
-                {dueToday.length === 0 ? "Protocol clear" : `${Math.max(dueToday.length - stats.completedToday, 0)} habit${Math.max(dueToday.length - stats.completedToday, 0) === 1 ? "" : "s"} left to complete`}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">Complete one more to keep the chain moving.</p>
-            </div>
-            <div className="w-full sm:w-48">
-              <div className="flex justify-between text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">
-                <span>Daily progress</span>
-                <span className="text-cyan-400">{Math.round((stats.completedToday / Math.max(dueToday.length, 1)) * 100)}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.min((stats.completedToday / Math.max(dueToday.length, 1)) * 100, 100)}%` }}
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-purple-500"
-                />
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Stats bar */}
-      {stats && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8"
-        >
-          <StatCard label="Total Habits" value={stats.totalHabits} />
-          <StatCard
-            label="Done Today"
-            value={`${stats.completedToday}/${dueToday.length}`}
-            color="text-emerald-400"
-          />
-          <StatCard
-            label="Best Streak"
-            value={`${stats.longestCurrentStreak}d`}
-            color="text-orange-400"
-          />
-          <StatCard
-            label="Completion Rate"
-            value={`${Math.round((stats.completedToday / Math.max(dueToday.length, 1)) * 100)}%`}
-            color="text-cyan-400"
-          />
-        </motion.div>
-      )}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="grid grid-cols-2 gap-3 mb-8 sm:grid-cols-4"
+      >
+        <StatCard label="Active Protocols" value={stats?.totalHabits ?? habits.length} icon={Target} />
+        <StatCard label="Today's Completion" value={`${Math.round(((stats?.completedToday || 0) / Math.max(dueToday.length, 1)) * 100)}%`} color="text-cyan-400" icon={Gauge} />
+        <StatCard label="Best Streak" value={`${stats?.longestCurrentStreak || 0}d`} color="text-orange-400" icon={Flame} />
+        <StatCard label="XP Available" value={`+${habits.reduce((sum, h) => sum + Number(h.xpReward || 0), 0)}`} color="text-yellow-400" icon={Zap} />
+      </motion.div>
 
       <motion.div
         variants={staggerContainer}
@@ -308,7 +265,7 @@ export default function HabitsPage() {
             />
           ) : (
             <div className="space-y-3">
-              <AnimatePresence>
+              <AnimatePresence mode="popLayout">
                 {dueToday.map((habit) => (
                   <HabitCard
                     key={habit._id}
@@ -501,11 +458,11 @@ function HabitCard({ habit, onComplete, onUncomplete, onDelete, loading }) {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 10 }}
       whileHover={{ y: -2, scale: 1.005 }}
-      className={`glass rounded-xl p-4 flex items-center gap-4 border transition-all duration-300
+      className={`group relative overflow-hidden rounded-[22px] p-4 sm:p-5 flex items-center gap-3 sm:gap-4 border bg-slate-950/65 backdrop-blur-xl transition-all duration-300 shadow-xl shadow-black/10
                   ${
                     habit.completedToday
-                      ? "border-emerald-500/30 bg-emerald-500/5"
-                      : "border-slate-700/50 hover:border-slate-600/60"
+                      ? "border-emerald-500/25 bg-emerald-500/[0.06] shadow-emerald-500/[0.03]"
+                      : "border-white/5 hover:-translate-y-0.5 hover:border-cyan-400/15 hover:bg-slate-900/80"
                   }`}
     >
       {/* Complete button */}
@@ -513,10 +470,10 @@ function HabitCard({ habit, onComplete, onUncomplete, onDelete, loading }) {
         aria-label={habit.completedToday ? `Undo ${habit.name}` : `Complete ${habit.name}`}
         onClick={habit.completedToday ? onUncomplete : onComplete}
         disabled={loading}
-        className={`shrink-0 transition-all duration-200 active:scale-90 ${
+        className={`shrink-0 rounded-2xl border p-1 transition-all duration-300 active:scale-90 ${
           habit.completedToday
-            ? "text-emerald-400"
-            : "text-slate-600 hover:text-cyan-400"
+            ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-400 shadow-[0_0_18px_rgba(52,211,153,.10)]"
+            : "border-white/5 bg-white/[0.02] text-slate-600 hover:border-cyan-400/20 hover:text-cyan-400"
         }`}
       >
         {habit.completedToday ? (
@@ -602,11 +559,17 @@ function HabitCard({ habit, onComplete, onUncomplete, onDelete, loading }) {
   );
 }
 
-function StatCard({ label, value, color = "text-slate-100" }) {
+function StatCard({ label, value, color = "text-slate-100", icon: Icon = Target }) {
   return (
-    <motion.div whileHover={{ y: -2 }} className="glass rounded-xl p-4 border border-slate-800/60 hover:border-cyan-500/20 transition-colors">
-      <p className="text-hud mb-1">{label}</p>
-      <p className={`font-display text-xl font-bold ${color}`}>{value}</p>
+    <motion.div whileHover={{ y: -3 }} className="group rounded-2xl border border-white/5 bg-slate-950/65 p-4 backdrop-blur-xl transition-all hover:border-cyan-400/10 hover:shadow-xl hover:shadow-cyan-500/[0.03]">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-2 text-cyan-400 transition group-hover:scale-105">
+          <Icon size={14} />
+        </span>
+        <TrendingUp size={13} className="text-slate-800" />
+      </div>
+      <p className={`font-display text-xl font-black ${color}`}>{value}</p>
+      <p className="mt-1 text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">{label}</p>
     </motion.div>
   );
 }

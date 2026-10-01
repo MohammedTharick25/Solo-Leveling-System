@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Play, Pause, Square } from "lucide-react";
 import api from "../../lib/api.js";
 import { useAudio } from "../../hooks/useAudio.js";
+import { syncProgressionQueries } from "../../lib/systemSync.js";
 import {
   pageVariants,
   staggerContainer,
@@ -25,43 +27,89 @@ const SESSION_TYPES = [
 
 export default function PomodoroPage() {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const recommendedAction = location.state?.recommendedAction;
+  const recommendedDuration = Number(recommendedAction?.durationMinutes);
+  const normalizedRecommendedDuration = Math.max(
+    1,
+    Math.min(240, Math.round(recommendedDuration || 25)),
+  );
+  const recommendedSessionType =
+    SESSION_TYPES.find((type) => type.duration === normalizedRecommendedDuration) ||
+    SESSION_TYPES[0];
   const { playQuestComplete, playNotification } = useAudio();
   const intervalRef = useRef(null);
 
-  const [selectedType, setSelectedType] = useState(SESSION_TYPES[0]);
+  const [selectedType, setSelectedType] = useState(() =>
+    recommendedAction
+      ? { ...recommendedSessionType, duration: normalizedRecommendedDuration }
+      : SESSION_TYPES[0],
+  );
+
+  const [linkedQuestId, setLinkedQuestId] = useState("");
+  const [linkedGoalId, setLinkedGoalId] = useState("");
   const [activeSession, setActiveSession] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const [running, setRunning] = useState(false);
   const [resumed, setResumed] = useState(false);
 
   // ── On mount: check for an existing open session ─────────────────────────
-  useQuery({
+  const {
+    data: persistedSession,
+    isFetchedAfterMount,
+  } = useQuery({
     queryKey: ["focus-active"],
     queryFn: async () => {
       const { data } = await api.get("/focus/active");
       return data.data.session;
     },
-    onSuccess: (session) => {
-      if (session && !activeSession) {
-        // Calculate how many seconds have already elapsed since startedAt
-        const elapsedSecs = Math.floor(
-          (Date.now() - new Date(session.startedAt).getTime()) / 1000,
-        );
-        // Find matching session type config for display
-        const match =
-          SESSION_TYPES.find((t) => t.type === session.type) ||
-          SESSION_TYPES[0];
-        setSelectedType(match);
-        setActiveSession(session);
-        setElapsed(elapsedSecs);
-        setRunning(true);
-        setResumed(true);
-      }
-    },
     // Only run once on mount — don't keep refetching while timer is running
-    staleTime: Infinity,
+    staleTime: 0,
+    refetchOnMount: "always",
     retry: false,
   });
+
+  useEffect(() => {
+    if (!isFetchedAfterMount) return;
+    if (!persistedSession) {
+      setActiveSession(null);
+      setElapsed(0);
+      setRunning(false);
+      setResumed(false);
+      return;
+    }
+
+    const match =
+      SESSION_TYPES.find((type) => type.type === persistedSession.type) ||
+      SESSION_TYPES[0];
+    setSelectedType({ ...match, duration: persistedSession.plannedDuration });
+    const linkedQuest = persistedSession.linkedQuestId;
+    setLinkedQuestId(
+      linkedQuest && typeof linkedQuest === "object"
+        ? linkedQuest._id
+        : linkedQuest || "",
+    );
+    const linkedGoal = persistedSession.linkedGoalId;
+    setLinkedGoalId(
+      linkedGoal && typeof linkedGoal === "object"
+        ? linkedGoal._id
+        : linkedGoal || "",
+    );
+    setActiveSession(persistedSession);
+    const elapsedUntil = persistedSession.pausedAt
+      ? new Date(persistedSession.pausedAt).getTime()
+      : Date.now();
+    setElapsed(
+      Math.max(
+        0,
+        Math.floor(
+          (elapsedUntil - new Date(persistedSession.startedAt).getTime()) / 1000,
+        ) - Number(persistedSession.pausedDurationSeconds || 0),
+      ),
+    );
+    setRunning(!persistedSession.pausedAt);
+    setResumed(true);
+  }, [isFetchedAfterMount, persistedSession]);
 
   // ── Tick every second ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -89,6 +137,40 @@ export default function PomodoroPage() {
     },
   });
 
+  const { data: questData } = useQuery({
+    queryKey: ["quests"],
+    queryFn: async () => {
+      const { data } = await api.get("/quests");
+      return data.data;
+    },
+  });
+  const availableQuests = (questData?.quests || []).filter(
+    (quest) => quest.status === "active",
+  );
+
+  useEffect(() => {
+    if (!recommendedAction || !questData || persistedSession) return;
+    if (recommendedAction.goalId) setLinkedGoalId(recommendedAction.goalId);
+    const title = recommendedAction.title?.trim().toLowerCase();
+    const matchingQuest = availableQuests.find(
+      (quest) =>
+        quest.status === "active" &&
+        ((recommendedAction.questId &&
+          String(quest._id) === String(recommendedAction.questId)) ||
+          quest.title.trim().toLowerCase() === title),
+    );
+    if (matchingQuest) {
+      setLinkedQuestId(matchingQuest._id);
+      if (matchingQuest.goalId) setLinkedGoalId(String(matchingQuest.goalId));
+    }
+  }, [recommendedAction, questData, persistedSession]);
+  const { data: goalData } = useQuery({
+    queryKey: ["goals"],
+    queryFn: async () => (await api.get("/goals")).data.data,
+  });
+  const availableGoals = (goalData?.goals || []).filter(
+    (goal) => goal.status === "active",
+  );
   const startMutation = useMutation({
     mutationFn: (body) => api.post("/focus/start", body),
     onSuccess: ({ data }) => {
@@ -96,6 +178,27 @@ export default function PomodoroPage() {
       setElapsed(0);
       setRunning(true);
       setResumed(false);
+      queryClient.invalidateQueries({ queryKey: ["focus-active"] });
+    },
+  });
+
+  const pauseMutation = useMutation({
+    mutationFn: (id) => api.patch("/focus/" + id + "/pause"),
+    onSuccess: ({ data }) => {
+      const session = data.data.session;
+      setActiveSession(session);
+      setRunning(false);
+      queryClient.setQueryData(["focus-active"], session);
+    },
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: (id) => api.patch("/focus/" + id + "/resume"),
+    onSuccess: ({ data }) => {
+      const session = data.data.session;
+      setActiveSession(session);
+      setRunning(true);
+      queryClient.setQueryData(["focus-active"], session);
     },
   });
 
@@ -107,10 +210,8 @@ export default function PomodoroPage() {
       setRunning(false);
       setElapsed(0);
       setResumed(false);
-      queryClient.invalidateQueries({ queryKey: ["focus-history"] });
-      queryClient.invalidateQueries({ queryKey: ["focus-skill"] });
-      queryClient.invalidateQueries({ queryKey: ["focus-active"] });
-      queryClient.invalidateQueries({ queryKey: ["hunter"] });
+      queryClient.setQueryData(["focus-active"], null);
+      syncProgressionQueries(queryClient);
     },
   });
 
@@ -124,6 +225,8 @@ export default function PomodoroPage() {
     startMutation.mutate({
       type: selectedType.type,
       plannedDuration: selectedType.duration,
+      linkedQuestId: linkedQuestId || null,
+      linkedGoalId: linkedGoalId || null,
     });
   };
 
@@ -145,7 +248,16 @@ export default function PomodoroPage() {
   }, [remaining]);
 
   const skills = statsData?.stats;
-
+  const activeLinkedQuestTitle =
+    activeSession?.linkedQuestId?.title ||
+    availableQuests.find(
+      (quest) => String(quest._id) === String(linkedQuestId),
+    )?.title;
+  const activeLinkedGoalTitle =
+    activeSession?.linkedGoalId?.title ||
+    availableGoals.find(
+      (goal) => String(goal._id) === String(linkedGoalId),
+    )?.title;
   return (
     <motion.div
       variants={pageVariants}
@@ -176,23 +288,77 @@ export default function PomodoroPage() {
           <Card className="flex flex-col items-center py-10">
             {/* Session type selector — hide while session active */}
             {!activeSession && (
-              <div className="flex flex-wrap gap-2 mb-8 justify-center">
-                {SESSION_TYPES.map((st) => (
-                  <button
-                    key={st.type}
-                    onClick={() => setSelectedType(st)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-heading text-sm
-                                font-semibold border transition-all
-                                ${
-                                  selectedType.type === st.type
-                                    ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-400"
-                                    : "border-slate-700 text-slate-500 hover:text-slate-300"
-                                }`}
+              <div className="mb-8 flex flex-col items-center gap-4">
+                <div className="flex flex-wrap justify-center gap-2">
+                  {SESSION_TYPES.map((st) => (
+                    <button
+                      key={st.type}
+                      onClick={() => setSelectedType(st)}
+                      className={
+                        selectedType.type === st.type
+                          ? "flex items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-4 py-2 font-heading text-sm font-semibold text-cyan-400 transition-all"
+                          : "flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 font-heading text-sm font-semibold text-slate-500 transition-all hover:text-slate-300"
+                      }
+                    >
+                      <span>{st.emoji}</span>
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+                                <label className="flex w-full max-w-md flex-col gap-2 font-heading text-xs text-slate-400">
+                  Focus toward a goal
+                  <select
+                    value={linkedGoalId}
+                    onChange={(event) => {
+                      const goalId = event.target.value;
+                      setLinkedGoalId(goalId);
+                      const goalQuest = availableQuests.find(
+                        (quest) => String(quest.goalId || "") === String(goalId),
+                      );
+                      setLinkedQuestId(goalQuest?._id || "");
+                    }}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 outline-none focus:border-cyan-500/60"
                   >
-                    <span>{st.emoji}</span>
-                    {st.label}
-                  </button>
-                ))}
+                    <option value="">No linked goal</option>
+                    {availableGoals.map((goal) => (
+                      <option key={goal._id} value={goal._id}>{goal.title}</option>
+                    ))}
+                  </select>
+                </label>
+<label className="flex w-full max-w-md flex-col gap-2 font-heading text-xs text-slate-400">
+                  Focus toward a quest
+                  <select
+                    value={linkedQuestId}
+                    onChange={(event) => {
+                      const questId = event.target.value;
+                      setLinkedQuestId(questId);
+                      const quest = availableQuests.find(
+                        (item) => String(item._id) === String(questId),
+                      );
+                      setLinkedGoalId(quest?.goalId ? String(quest.goalId) : "");
+                    }}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 outline-none focus:border-cyan-500/60"
+                  >
+                    <option value="">No linked quest</option>
+                    {availableQuests.map((quest) => (
+                      <option key={quest._id} value={quest._id}>
+                        {quest.title}
+                        {quest.unit
+                          ? " (" +
+                            (quest.currentValue || 0) +
+                            "/" +
+                            quest.targetValue +
+                            " " +
+                            quest.unit +
+                            ")"
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="font-body text-[11px] text-slate-500">
+                    Focus time advances linked quests measured in minutes.
+                  </span>
+                </label>
               </div>
             )}
 
@@ -242,9 +408,21 @@ export default function PomodoroPage() {
                     : `${selectedType.duration} min`}
                 </span>
                 {activeSession && (
+                  <>
                   <Badge color="cyan" className="mt-2">
                     {running ? "● RUNNING" : "⏸ PAUSED"}
                   </Badge>
+                  {activeLinkedGoalTitle && (
+                    <span className="mt-2 max-w-48 truncate font-heading text-[10px] text-violet-300">
+                      Goal: {activeLinkedGoalTitle}
+                    </span>
+                  )}
+                  {activeLinkedQuestTitle && (
+                    <span className="mt-1 max-w-48 truncate font-heading text-[10px] text-cyan-300">
+                      Quest: {activeLinkedQuestTitle}
+                    </span>
+                  )}
+                  </>
                 )}
               </div>
             </div>
@@ -265,10 +443,15 @@ export default function PomodoroPage() {
                   <Button
                     variant="ghost"
                     size="md"
-                    onClick={() => setRunning((r) => !r)}
+                    loading={pauseMutation.isPending || resumeMutation.isPending}
+                    onClick={() =>
+                      activeSession.pausedAt
+                        ? resumeMutation.mutate(activeSession._id)
+                        : pauseMutation.mutate(activeSession._id)
+                    }
                   >
-                    {running ? <Pause size={16} /> : <Play size={16} />}
-                    {running ? "Pause" : "Resume"}
+                    {activeSession.pausedAt ? <Play size={16} /> : <Pause size={16} />}
+                    {activeSession.pausedAt ? "Resume" : "Pause"}
                   </Button>
                   <Button
                     variant="primary"
@@ -338,6 +521,16 @@ export default function PomodoroPage() {
                     <p className="font-body text-[10px] text-slate-500">
                       {s.actualDuration}m
                     </p>
+                    {s.linkedGoalId?.title && (
+                      <p className="mt-1 max-w-40 truncate font-body text-[10px] text-violet-400/80">
+                        Goal: {s.linkedGoalId.title}
+                      </p>
+                    )}
+                    {s.linkedQuestId?.title && (
+                      <p className="mt-1 max-w-40 truncate font-body text-[10px] text-cyan-500/80">
+                        Quest: {s.linkedQuestId.title}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p

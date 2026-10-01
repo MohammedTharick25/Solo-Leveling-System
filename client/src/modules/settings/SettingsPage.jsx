@@ -626,23 +626,25 @@ function WeeklyReportSettings() {
 
   return (
     <motion.div variants={staggerItem} className="space-y-4">
-      <div className="flex justify-end"><Button variant="secondary" loading={generating} onClick={generate}><FileText size={14} /> Generate This Week's Report</Button></div>
-      {data?.report ? <WeeklyReportCard report={data.report} /> : <Card><p className="font-body text-sm text-slate-500 text-center py-8">No report generated yet. Reports are auto-generated every Sunday, or you can generate one now.</p></Card>}
+      <div className="flex justify-end"><Button variant="secondary" loading={generating} onClick={generate}><FileText size={14} /> Generate Previous Week's Report</Button></div>
+      {data?.report ? <WeeklyReportCard report={data.report} /> : <Card><p className="font-body text-sm text-slate-500 text-center py-8">No report for the previous completed week yet. Reports are generated automatically, or you can generate one now.</p></Card>}
     </motion.div>
   );
 }
 
 function WeeklyReportCard({ report }) {
   const trendColor = report.productivityTrend === "rising" ? "text-emerald-400" : report.productivityTrend === "declining" ? "text-red-400" : "text-yellow-400";
+  const dateOptions = { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" };
+  const weekRange = `${new Date(report.weekStart).toLocaleDateString(undefined, dateOptions)} – ${new Date(report.weekEnd).toLocaleDateString(undefined, dateOptions)}`;
   return (
     <Card>
       <div className="flex justify-between items-start mb-6">
-        <div><h2 className="font-display text-2xl font-black text-gradient-hero print:text-black">HUNTER PROGRESS REPORT</h2><p className="font-heading text-slate-500 uppercase tracking-widest text-xs">Sector: Performance Intelligence</p></div>
+        <div><h2 className="font-display text-2xl font-black text-gradient-hero print:text-black">HUNTER PROGRESS REPORT</h2><p className="font-heading text-slate-500 uppercase tracking-widest text-xs">Sector: Performance Intelligence</p><p className="mt-2 text-xs text-cyan-300">Week: {weekRange}</p></div>
         <Button variant="secondary" size="sm" onClick={() => window.print()} className="print:hidden">Download PDF</Button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Metric label="Quest Completion" value={`${Math.round((report.questCompletionRate || 0) * 100)}%`} />
-        <Metric label="Total XP" value={(report.totalXPEarned || 0).toLocaleString()} />
+        <Metric label="Activity XP" value={(report.totalXPEarned || 0).toLocaleString()} />
         <Metric label="Focus Minutes" value={`${report.totalFocusMinutes || 0}m`} />
         <Metric label="Streak" value={`${report.streakPerformance || 0}d`} />
       </div>

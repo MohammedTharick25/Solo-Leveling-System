@@ -20,8 +20,92 @@ const normalizeCategory = (category) =>
     ? category
     : "personal";
 
-export const listGoals = async (userId) =>
-  Goal.find({ userId }).sort({ status: 1, createdAt: -1 }).lean();
+export const listGoals = async (userId) => {
+  const goals = await Goal.find({ userId }).sort({ status: 1, createdAt: -1 }).lean();
+  if (!goals.length) return [];
+
+  const goalIds = goals.map((goal) => goal._id);
+  const linkedQuests = await Quest.find({ userId, goalId: { $in: goalIds } })
+    .select("goalId goalQuestId status completedAt failedAt")
+    .lean();
+
+  const questMap = new Map(
+    linkedQuests.map((quest) => [String(quest.goalQuestId), quest]),
+  );
+
+  return goals.map((goal) => {
+    let totalGoalQuests = 0;
+    let completedGoalQuests = 0;
+
+    const milestones = (goal.milestones || []).map((milestone) => {
+      let milestoneCompleted = 0;
+      const quests = (milestone.quests || []).map((goalQuest) => {
+        totalGoalQuests += 1;
+        const linked = questMap.get(String(goalQuest._id));
+        const runtimeStatus = linked?.status || "not_added";
+
+        if (runtimeStatus === "completed") completedGoalQuests += 1;
+        if (runtimeStatus === "completed") milestoneCompleted += 1;
+
+        return {
+          ...goalQuest,
+          runtimeStatus,
+          completedAt: linked?.completedAt || null,
+          failedAt: linked?.failedAt || null,
+          linkedQuestId: linked?._id || null,
+        };
+      });
+
+      const milestoneTotal = quests.length;
+      const milestoneProgress = milestoneTotal
+        ? Math.round((milestoneCompleted / milestoneTotal) * 100)
+        : 0;
+      return {
+        ...milestone,
+        quests,
+        progress: milestoneProgress,
+        completedQuestCount: milestoneCompleted,
+        totalQuestCount: milestoneTotal,
+        // Status is assigned in a second pass below so milestone N can unlock
+        // immediately when milestone N-1 is completed.
+        status: milestone.status,
+      };
+    });
+
+    // Milestones are sequential: the first is available, and each later
+    // milestone unlocks only after the previous milestone is completed.
+    // Do not trust a stale persisted "locked" value here because older goal
+    // records may still contain the original locked status.
+    let previousCompleted = true;
+    const resolvedMilestones = milestones.map((milestone) => {
+      const completed = milestone.totalQuestCount > 0
+        && milestone.completedQuestCount === milestone.totalQuestCount;
+
+      const status = completed
+        ? "completed"
+        : previousCompleted
+          ? "active"
+          : "locked";
+
+      previousCompleted = completed;
+
+      return { ...milestone, status };
+    });
+
+    const missionProgress = totalGoalQuests
+      ? Math.round((completedGoalQuests / totalGoalQuests) * 100)
+      : 0;
+
+    return {
+      ...goal,
+      milestones: resolvedMilestones,
+      totalGoalQuests,
+      completedGoalQuests,
+      missionProgress,
+      allGoalQuestsCompleted: totalGoalQuests > 0 && completedGoalQuests === totalGoalQuests,
+    };
+  });
+};
 
 export const createGoal = async (userId, data) => {
   const title = String(data.title || "").trim();

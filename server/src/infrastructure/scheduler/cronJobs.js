@@ -109,8 +109,8 @@ export const startCronJobs = (io) => {
     }
   });
 
-  // ── Sunday 00:05: Generate weekly Hunter Reports ──────────────────────────
-  cron.schedule("5 0 * * 0", async () => {
+  // ── Monday 00:05 UTC: Generate weekly Hunter Reports ──────────────────────────
+  cron.schedule("5 0 * * 1", async () => {
     console.log("[CRON] Weekly reports...");
     try {
       const users = await User.find({ isActive: true, isAwakened: true })
@@ -125,7 +125,7 @@ export const startCronJobs = (io) => {
     } catch (err) {
       console.error("[CRON] Weekly reports error:", err.message);
     }
-  });
+  }, { timezone: "UTC" });
 
   // ── Daily 1:00 AM: Leaderboard rebuild ────────────────────────────────────
   cron.schedule("0 1 * * *", async () => {

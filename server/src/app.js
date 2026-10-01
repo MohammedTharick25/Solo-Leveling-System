@@ -30,6 +30,7 @@ import habitRoutes from "./modules/habits/habit.routes.js";
 import achievementRoutes from "./modules/achievements/achievement.routes.js";
 import aiRoutes from "./modules/ai/ai.routes.js";
 import goalRoutes from "./modules/goals/goal.routes.js";
+import billingRoutes from "./modules/billing/billing.routes.js";
 
 const app = express();
 
@@ -43,7 +44,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://checkout.razorpay.com"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: [
@@ -52,6 +53,7 @@ app.use(
           "https://res.cloudinary.com",
           "https://img.icons8.com",
         ], // Allow Cloudinary & Icons8
+        frameSrc: ["'self'", "https://api.razorpay.com", "https://checkout.razorpay.com"],
         connectSrc: [
           "'self'",
           "http://localhost:5000",
@@ -59,6 +61,8 @@ app.use(
           "https://solo-leveling-system-frontend.onrender.com",
           "https://solo-leveling-system-backend-we1h.onrender.com",
           "ws://localhost:5000",
+          "https://api.razorpay.com",
+          "https://checkout.razorpay.com",
         ],
       },
     },
@@ -97,7 +101,12 @@ app.use(
 app.use(mongoSanitize());
 
 // ── Parsing ───────────────────────────────────────────────────────────────────
-app.use(express.json({ limit: "10kb" }));
+app.use(express.json({
+  limit: "10kb",
+  verify: (req, _res, buffer) => {
+    if (req.originalUrl === "/api/v1/billing/webhook") req.rawBody = Buffer.from(buffer);
+  },
+}));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(cookieParser());
 
@@ -138,6 +147,7 @@ app.use(`${API}/habits`, habitRoutes);
 app.use(`${API}/achievements`, achievementRoutes);
 app.use(`${API}/ai`, aiRoutes);
 app.use(`${API}/goals`, goalRoutes);
+app.use(`${API}/billing`, billingRoutes);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {

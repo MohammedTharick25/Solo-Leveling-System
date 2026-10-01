@@ -20,6 +20,7 @@ import {
   Trophy,
   Calendar,
   Bot,
+  CreditCard,
 } from "lucide-react";
 import { useHunterStore } from "../../stores/hunterStore.js";
 import { RANK_COLORS } from "../../lib/xpFormulas.js";
@@ -44,6 +45,7 @@ const NAV_ITEMS = [
   { to: "/ai-coach", icon: Bot, label: "AI Hunter Coach" },
   { to: "/achievements", icon: Trophy, label: "Achievements" },
   { to: "/social", icon: Users, label: "Guild & Social" },
+  { to: "/billing", icon: CreditCard, label: "Plans & Billing" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 

@@ -60,6 +60,21 @@ const userSchema = new mongoose.Schema(
     country: { type: String, default: "Unknown", trim: true, maxlength: 80 },
     timezone: { type: String, default: "UTC", trim: true, maxlength: 100 },
     bio: { type: String, default: "", trim: true, maxlength: 240 },
+    billing: {
+      tier: { type: String, enum: ["free", "hunter", "monarch"], default: "free" },
+      status: {
+        type: String,
+        enum: ["inactive", "created", "authenticated", "active", "pending", "halted", "cancelled", "completed", "expired"],
+        default: "inactive",
+      },
+      provider: { type: String, enum: ["razorpay"], default: null },
+      razorpaySubscriptionId: { type: String, default: null },
+      razorpayPlanId: { type: String, default: null },
+      lastPaymentId: { type: String, default: null },
+      currentPeriodStart: { type: Date, default: null },
+      currentPeriodEnd: { type: Date, default: null },
+      cancelAtCycleEnd: { type: Boolean, default: false },
+    },
     settings: {
       notifications: {
         enabled: { type: Boolean, default: true },

@@ -26,7 +26,11 @@ const focusSessionSchema = new mongoose.Schema(
       ref: "TaskRaid",
       default: null,
     },
-    linkedQuestId: {
+    linkedGoalId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Goal",
+      default: null,
+    },    linkedQuestId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Quest",
       default: null,
@@ -35,6 +39,8 @@ const focusSessionSchema = new mongoose.Schema(
     tags: [String],
     startedAt: { type: Date, required: true },
     endedAt: Date,
+    pausedAt: { type: Date, default: null },
+    pausedDurationSeconds: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true },
 );

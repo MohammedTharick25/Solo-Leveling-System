@@ -50,6 +50,24 @@ export const getHabits = async (userId) => {
   });
 };
 
+const getPreviousScheduledDay = (habit, todayStart) => {
+  const customDays = new Set(habit.targetDays || []);
+
+  for (let offset = 1; offset <= 7; offset += 1) {
+    const candidate = new Date(todayStart);
+    candidate.setUTCDate(candidate.getUTCDate() - offset);
+    const day = candidate.getUTCDay();
+    const scheduled =
+      habit.frequency === "daily" ||
+      (habit.frequency === "weekdays" && day >= 1 && day <= 5) ||
+      (habit.frequency === "weekends" && (day === 0 || day === 6)) ||
+      (habit.frequency === "custom" && customDays.has(day));
+
+    if (scheduled) return startOfDay(candidate);
+  }
+
+  return null;
+};
 export const completeHabit = async (habitId, userId, note = "", io = null) => {
   const habit = await Habit.findOne({ _id: habitId, userId, isActive: true });
   if (!habit) throw new AppError("Habit not found.", 404);
@@ -72,20 +90,18 @@ export const completeHabit = async (habitId, userId, note = "", io = null) => {
     (c) => new Date(c.date) >= cutoff,
   );
 
-  // Update streak
-  const yesterday = startOfDay(new Date(Date.now() - 86400000));
-  const yesterdayEnd = endOfDay(new Date(Date.now() - 86400000));
-  const completedYesterday = habit.completions.some((c) => {
-    const d = new Date(c.date);
-    return d >= yesterday && d <= yesterdayEnd;
-  });
+  // Keep a streak across days when this habit is not scheduled.
+  const previousScheduledDay = getPreviousScheduledDay(habit, todayStart);
+  const completedPreviousSchedule =
+    previousScheduledDay &&
+    habit.completions.some((completion) => {
+      const date = new Date(completion.date);
+      return date >= previousScheduledDay && date <= endOfDay(previousScheduledDay);
+    });
 
-  if (completedYesterday || habit.currentStreak === 0) {
-    habit.currentStreak += 1;
-  } else {
-    habit.currentStreak = 1;
-  }
-
+  habit.currentStreak = completedPreviousSchedule
+    ? habit.currentStreak + 1
+    : 1;
   if (habit.currentStreak > habit.longestStreak) {
     habit.longestStreak = habit.currentStreak;
   }
@@ -93,8 +109,10 @@ export const completeHabit = async (habitId, userId, note = "", io = null) => {
   habit.totalCompletions += 1;
   await habit.save();
 
-  // Award XP and stat
-  await awardXP(userId, habit.xpReward, io);
+  // Store the awarded XP so the daily snapshot can count it accurately.
+  const xpResult = await awardXP(userId, habit.xpReward, io);
+  habit.completions[habit.completions.length - 1].earnedXP = xpResult.xpEarned;
+  await habit.save();
   if (habit.statReward?.stat) {
     await awardStatGains(userId, [habit.statReward]);
   }

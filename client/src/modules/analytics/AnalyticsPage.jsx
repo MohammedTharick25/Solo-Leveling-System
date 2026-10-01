@@ -147,6 +147,61 @@ export default function AnalyticsPage() {
   const stats = dashData?.stats;
   const trends = trendsData?.trends;
   const patterns = detectPatterns(snapshots);
+  const weeklyInsight = trends
+    ? (() => {
+        const thisWeek = trends.thisWeek || {};
+        const lastWeek = trends.lastWeek || {};
+        const activity =
+          (thisWeek.totalXP || 0) +
+          (thisWeek.totalQuests || 0) +
+          (thisWeek.totalHabits || 0) +
+          (thisWeek.avgFocus || 0);
+        const previousActivity =
+          (lastWeek.totalXP || 0) +
+          (lastWeek.totalQuests || 0) +
+          (lastWeek.totalHabits || 0) +
+          (lastWeek.avgFocus || 0);
+        if (activity === 0 && previousActivity === 0) {
+          return {
+            title: "Build your baseline",
+            body: "Complete one small quest or habit this week to start seeing useful patterns here.",
+            action: "Open quests",
+            href: "/quests",
+          };
+        }
+        const measures = [
+          { key: "totalXP", label: "XP earned", advice: "Choose one manageable quest and complete its next step.", href: "/quests" },
+          { key: "avgProductivity", label: "Productivity", advice: "Choose one priority quest and complete a focused block today.", href: "/quests" },
+          { key: "avgFocus", label: "Focus time", advice: "Schedule one focus session around your next active quest.", href: "/focus" },
+          { key: "totalQuests", label: "Quest completions", advice: "Pick one active quest and finish its smallest next step.", href: "/quests" },
+          { key: "totalHabits", label: "Habit consistency", advice: "Choose one habit to protect for the next three days.", href: "/habits" },
+        ]
+          .map((metric) => ({
+            ...metric,
+            current: thisWeek[metric.key] || 0,
+            previous: lastWeek[metric.key] || 0,
+          }))
+          .filter((metric) => metric.previous > 0 && metric.current < metric.previous)
+          .sort((a, b) => a.current / a.previous - b.current / b.previous);
+        if (measures.length) {
+          const clearestDrop = measures[0];
+          const drop = Math.round((1 - clearestDrop.current / clearestDrop.previous) * 100);
+          return {
+            title: clearestDrop.label + " down " + drop + "%",
+            body: clearestDrop.advice,
+            action: clearestDrop.href === "/focus" ? "Open focus" : clearestDrop.href === "/habits" ? "Open habits" : "Review quests",
+            href: clearestDrop.href,
+          };
+        }
+        return {
+          title: "Keep your momentum",
+          body: "Your tracked activity is holding steady or improving. Keep your next step small and repeatable.",
+          action: "Review quests",
+          href: "/quests",
+        };
+      })()
+    : null;
+
 
   const xpChartData = snapshots.slice(-14).map((s) => ({
     date: new Date(s.date).toLocaleDateString("en", {
@@ -296,18 +351,47 @@ export default function AnalyticsPage() {
         )}
 
         {/* ── Week comparison ─────────────────────────────────────────── */}
+        {weeklyInsight && (
+          <motion.div variants={staggerItem}>
+            <Card>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <span className="rounded-xl border border-cyan-400/10 bg-cyan-400/10 p-2 text-cyan-300">
+                    <BarChart3 size={17} />
+                  </span>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-400">Your next move</p>
+                    <h2 className="mt-1 font-heading text-lg font-bold text-white">{weeklyInsight.title}</h2>
+                    <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-400">{weeklyInsight.body}</p>
+                  </div>
+                </div>
+                <a
+                  href={weeklyInsight.href}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-cyan-400/15 bg-cyan-400/5 px-4 py-3 text-[9px] font-black uppercase tracking-widest text-cyan-300 transition hover:bg-cyan-400/10"
+                >
+                  {weeklyInsight.action}
+                  <TrendingUp size={13} />
+                </a>
+              </div>
+            </Card>
+          </motion.div>
+        )}
         {trends && (
           <motion.div variants={staggerItem}>
             <SectionHeader label="Performance" title="This Week vs Last Week" />
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
               {[
                 {
                   label: "Avg Productivity",
                   key: "avgProductivity",
                   suffix: "/100",
                 },
-                { label: "Total XP", key: "totalXP", suffix: "" },
+                { label: "Activity XP", key: "totalXP", suffix: "" },
+                { label: "Quest XP", key: "questXP", suffix: "" },
+                { label: "Habit XP", key: "habitXP", suffix: "" },
+                { label: "Focus XP", key: "focusXP", suffix: "" },
                 { label: "Quests Done", key: "totalQuests", suffix: "" },
+                { label: "Habits Done", key: "totalHabits", suffix: "" },
                 { label: "Avg Focus", key: "avgFocus", suffix: "m" },
               ].map(({ label, key, suffix }) => (
                 <Card key={key}>
@@ -333,7 +417,7 @@ export default function AnalyticsPage() {
         {xpChartData.length > 0 && (
           <motion.div variants={staggerItem}>
             <Card>
-              <SectionHeader label="14-Day Trend" title="XP & Focus Minutes" />
+              <SectionHeader label="14-Day Trend" title="Activity XP & Focus Minutes" />
               <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={xpChartData}>
                   <defs>

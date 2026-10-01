@@ -9,6 +9,7 @@ const hunterReportSchema = new mongoose.Schema(
     },
     weekStart: { type: Date, required: true },
     weekEnd: { type: Date, required: true },
+    periodVersion: { type: Number, default: 1 },
     mostImprovedStat: String,
     mostImprovedStatDelta: Number,
     weakestStat: String,

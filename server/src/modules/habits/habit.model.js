@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const completionSchema = new mongoose.Schema(
   {
     date: { type: Date, required: true },
+    earnedXP: { type: Number, default: 0, min: 0 },
     note: String,
   },
   { _id: false },

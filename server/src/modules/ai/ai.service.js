@@ -6,6 +6,7 @@ import Habit from "../habits/habit.model.js";
 import Journal from "../journal/journal.model.js";
 import FocusSession from "../focusSession/focusSession.model.js";
 import Analytics from "../analytics/analytics.model.js";
+import Goal from "../goals/goal.model.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
 import { generateJSON, generateText, isCloudAIConfigured } from "../../lib/ai/ai.service.js";
 import { buildGoalBreakdownPrompt, buildNextActionPrompt } from "../../lib/ai/ai.prompts.js";
@@ -13,6 +14,7 @@ import { buildGoalBreakdownPrompt, buildNextActionPrompt } from "../../lib/ai/ai
 const daysAgo = (days) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
 const compactQuest = (quest) => ({
+  id: String(quest._id),
   title: quest.title,
   category: quest.category,
   difficulty: quest.difficulty,
@@ -20,6 +22,7 @@ const compactQuest = (quest) => ({
   progress: quest.progress,
   xpReward: quest.xpReward,
   dueAt: quest.dueAt,
+  goalId: quest.goalId ? String(quest.goalId) : null,
 });
 
 const compactJournal = (entry) => ({
@@ -35,12 +38,13 @@ const compactJournal = (entry) => ({
 });
 
 export const getHunterContext = async (userId) => {
-  const [user, hunter, stats, quests, habits, journals, focusSessions, analytics] =
+  const [user, hunter, stats, quests, goals, habits, journals, focusSessions, analytics] =
     await Promise.all([
       User.findById(userId).select("hunterName timezone country awakening bio"),
       Hunter.findOne({ userId }),
       Stats.findOne({ userId }),
       Quest.find({ userId }).sort({ dueAt: 1, createdAt: -1 }).limit(12),
+      Goal.find({ userId, status: "active" }).sort({ createdAt: 1 }).limit(8),
       Habit.find({ userId, isActive: true }).sort({ currentStreak: -1 }).limit(12),
       Journal.find({ userId, date: { $gte: daysAgo(7) } }).sort({ date: -1 }).limit(7),
       FocusSession.find({ userId, startedAt: { $gte: daysAgo(7) } })
@@ -99,7 +103,14 @@ export const getHunterContext = async (userId) => {
           performanceScore: stats.performanceScore,
         }
       : {},
-    quests: quests.map(compactQuest),
+    goals: goals.map((goal) => ({
+      id: String(goal._id),
+      title: goal.title,
+      category: goal.category,
+      progress: goal.progress,
+      targetDate: goal.targetDate,
+      nextMilestone: goal.milestones.find((milestone) => milestone.status !== "completed")?.title || null,
+    })),
     questSummary: {
       returned: quests.length,
       completed: completedQuests,
@@ -142,17 +153,59 @@ export const getHunterContext = async (userId) => {
 };
 
 const localNextAction = (context) => {
-  const openQuest = context.quests.find(
-    (quest) => quest.status !== "completed" && quest.status !== "failed",
-  );
+  const goals = context.goals || [];
+  const selectedGoal = context.selectedGoal || null;
+  const activeGoalIds = new Set(goals.map((goal) => goal.id));
+  const activeQuest = (quest) =>
+    quest.status !== "completed" && quest.status !== "failed";
+  const goalQuest = selectedGoal
+    ? context.quests.find(
+        (quest) => quest.goalId === selectedGoal.id && activeQuest(quest),
+      )
+    : context.quests.find(
+        (quest) => quest.goalId && activeGoalIds.has(quest.goalId) && activeQuest(quest),
+      );
+  const openQuest =
+    goalQuest || (!selectedGoal ? context.quests.find(activeQuest) : null);
+  const linkedGoal = selectedGoal ||
+    (openQuest?.goalId
+      ? goals.find((goal) => goal.id === openQuest.goalId)
+      : null);
 
   if (openQuest) {
     return {
       title: openQuest.title,
-      reason: "You already have an active quest. Finish one clear mission before adding more work.",
+      reason: linkedGoal
+        ? "This mission moves your goal forward: " + linkedGoal.title + ". Finish one clear step before adding more work."
+        : "You already have an active quest. Finish one clear mission before adding more work.",
       durationMinutes: openQuest.difficulty === "hard" ? 45 : 30,
       category: openQuest.category || "discipline",
       xpEstimate: openQuest.xpReward || 25,
+      questId: openQuest.id,
+      goalId: linkedGoal?.id || null,
+      goalTitle: linkedGoal?.title || null,
+      source: "local",
+    };
+  }
+
+  const nextGoal = selectedGoal || goals[0];
+  if (nextGoal) {
+    return {
+      title: nextGoal.nextMilestone
+        ? "Next step: " + nextGoal.nextMilestone
+        : "Take one step toward " + nextGoal.title,
+      reason:
+        "Your selected goal is " +
+        nextGoal.title +
+        (nextGoal.nextMilestone
+          ? ". Start with its next milestone."
+          : ". Choose one small action to move it forward."),
+      durationMinutes: 15,
+      category: nextGoal.category || "personal",
+      xpEstimate: 20,
+      questId: null,
+      goalId: nextGoal.id,
+      goalTitle: nextGoal.title,
       source: "local",
     };
   }
@@ -167,10 +220,12 @@ const localNextAction = (context) => {
     durationMinutes: 25,
     category: "focus",
     xpEstimate: 30,
+    questId: null,
+    goalId: null,
+    goalTitle: null,
     source: "local",
   };
 };
-
 export const chat = async ({ userId, question }) => {
   const context = await getHunterContext(userId);
   const answer = await generateText({ question, context });
@@ -186,16 +241,76 @@ export const chat = async ({ userId, question }) => {
   };
 };
 
-export const nextAction = async (userId) => {
+export const nextAction = async (userId, requestedGoalId = null) => {
   const context = await getHunterContext(userId);
+  if (requestedGoalId) {
+    context.selectedGoal =
+      context.goals.find((goal) => goal.id === String(requestedGoalId)) || null;
+    if (!context.selectedGoal) throw new AppError("Active goal not found.", 404);
+  } else {
+    const activeGoalIds = new Set(context.goals.map((goal) => goal.id));
+    const linkedQuest = context.quests.find(
+      (quest) =>
+        activeGoalIds.has(quest.goalId) &&
+        quest.status !== "completed" &&
+        quest.status !== "failed",
+    );
+    context.selectedGoal = linkedQuest
+      ? context.goals.find((goal) => goal.id === linkedQuest.goalId)
+      : [...context.goals].sort((a, b) => {
+          const aDate = a.targetDate ? new Date(a.targetDate).getTime() : Infinity;
+          const bDate = b.targetDate ? new Date(b.targetDate).getTime() : Infinity;
+          return aDate - bDate || Number(a.progress || 0) - Number(b.progress || 0);
+        })[0] || null;
+  }
+
   if (!isCloudAIConfigured()) return localNextAction(context);
 
   const result = await generateJSON({ prompt: buildNextActionPrompt(context) });
   if (!result?.title) return localNextAction(context);
 
-  return { ...result, source: "groq" };
-};
+  const selectedGoal = context.selectedGoal;
+  const matchingQuest = context.quests.find(
+    (quest) =>
+      quest.status !== "completed" &&
+      quest.status !== "failed" &&
+      (selectedGoal ? quest.goalId === selectedGoal.id : true) &&
+      quest.title.trim().toLowerCase() === result.title.trim().toLowerCase(),
+  );
 
+  if (selectedGoal && matchingQuest) {
+    return {
+      ...result,
+      title: matchingQuest.title,
+      reason: "This active quest moves your selected goal forward: " + selectedGoal.title + ".",
+      questId: matchingQuest.id,
+      goalId: selectedGoal.id,
+      goalTitle: selectedGoal.title,
+      source: "groq",
+    };
+  }
+
+  if (selectedGoal) {
+    return {
+      ...result,
+      goalId: selectedGoal.id,
+      goalTitle: selectedGoal.title,
+      questId: null,
+      source: "groq",
+    };
+  }
+
+  const linkedGoal = matchingQuest?.goalId
+    ? context.goals.find((goal) => goal.id === matchingQuest.goalId)
+    : null;
+  return {
+    ...result,
+    questId: matchingQuest?.id || null,
+    goalId: linkedGoal?.id || null,
+    goalTitle: linkedGoal?.title || null,
+    source: "groq",
+  };
+};
 export const breakdownGoal = async ({ userId, goal }) => {
   if (!goal?.trim()) throw new AppError("Goal is required.", 400);
 

@@ -40,6 +40,12 @@ const config = {
   GROQ_API_KEY: process.env.GROQ_API_KEY,
   GROQ_MODEL: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
   AI_MAX_OUTPUT_TOKENS: parseInt(process.env.AI_MAX_OUTPUT_TOKENS, 10) || 700,
+
+  RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
+  RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
+  RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET,
+  RAZORPAY_HUNTER_PLAN_ID: process.env.RAZORPAY_HUNTER_PLAN_ID,
+  RAZORPAY_MONARCH_PLAN_ID: process.env.RAZORPAY_MONARCH_PLAN_ID,
 };
 
 export default config;

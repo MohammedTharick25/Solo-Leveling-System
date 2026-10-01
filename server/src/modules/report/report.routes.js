@@ -80,14 +80,15 @@ const getRecommendations = (weakestStat) => {
 };
 
 export const generateWeeklyReport = async (userId, io = null) => {
-  const weekStart = startOfWeek();
-  const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 3600 * 1000);
+  const currentWeekStart = startOfWeek();
+  const weekStart = new Date(currentWeekStart.getTime() - 7 * 24 * 3600 * 1000);
+  const weekEnd = new Date(currentWeekStart.getTime() - 1);
 
-  // Don't regenerate if already exists for this week
+  // Reports cover the most recently completed Monday-through-Sunday week.
   const existing = await HunterReport.findOne({ userId, weekStart });
-  if (existing) return existing;
+  if (existing?.periodVersion === 2) return existing;
 
-  const lastWeekStart = new Date(weekStart.getTime() - 7 * 24 * 3600 * 1000);
+  const priorWeekStart = new Date(weekStart.getTime() - 7 * 24 * 3600 * 1000);
 
   const [
     hunter,
@@ -100,21 +101,26 @@ export const generateWeeklyReport = async (userId, io = null) => {
   ] = await Promise.all([
     Hunter.findOne({ userId }),
     Stats.findOne({ userId }),
-    Analytics.find({ userId, date: { $gte: lastWeekStart, $lt: weekStart } }),
-    Quest.find({ userId, updatedAt: { $gte: lastWeekStart, $lt: weekStart } }),
-    Journal.find({ userId, date: { $gte: lastWeekStart, $lt: weekStart } }),
+    Analytics.find({ userId, date: { $gte: weekStart, $lt: currentWeekStart } }),
+    Quest.find({ userId, updatedAt: { $gte: weekStart, $lt: currentWeekStart } }),
+    Journal.find({ userId, date: { $gte: weekStart, $lt: currentWeekStart } }),
     Boss.countDocuments({
       userId,
       status: "defeated",
-      defeatedAt: { $gte: lastWeekStart },
+      defeatedAt: { $gte: weekStart, $lt: currentWeekStart },
     }),
-    Shadow.countDocuments({ userId, updatedAt: { $gte: lastWeekStart } }),
+    Shadow.countDocuments({
+      userId,
+      updatedAt: { $gte: weekStart, $lt: currentWeekStart },
+    }),
   ]);
 
   // Stat deltas — find most improved and weakest
   const statDeltas = STAT_NAMES.map((name) => {
     const hist = stats?.[name]?.history || [];
-    const recent = hist.filter((h) => new Date(h.date) >= lastWeekStart);
+    const recent = hist.filter((h) =>
+      new Date(h.date) >= weekStart && new Date(h.date) < currentWeekStart
+    );
     if (recent.length < 2)
       return { name, delta: 0, current: stats?.[name]?.value || 0 };
     const delta = recent[recent.length - 1].value - recent[0].value;
@@ -137,8 +143,8 @@ export const generateWeeklyReport = async (userId, io = null) => {
   const prevWeekAnalytics = await Analytics.find({
     userId,
     date: {
-      $gte: new Date(lastWeekStart.getTime() - 7 * 24 * 3600 * 1000),
-      $lt: lastWeekStart,
+      $gte: priorWeekStart,
+      $lt: weekStart,
     },
   });
   const prevAvgScore = prevWeekAnalytics.length
@@ -163,50 +169,58 @@ export const generateWeeklyReport = async (userId, io = null) => {
     STAT_NAMES.map((n) => [n, stats?.[n]?.value || 0]),
   );
 
-  const report = await HunterReport.create({
-    userId,
-    weekStart,
-    weekEnd,
-    mostImprovedStat: mostImproved?.name || "N/A",
-    mostImprovedStatDelta: mostImproved?.delta || 0,
-    weakestStat: weakest?.name || "N/A",
-    weakestStatValue: weakest?.current || 0,
-    productivityTrend,
-    streakPerformance: hunter?.currentStreak || 0,
-    questCompletionRate: completionRate,
-    totalQuestsAssigned: assigned,
-    totalQuestsCompleted: completed,
-    totalXPEarned: totalXP,
-    totalFocusMinutes: totalFocus,
-    suggestedFocusArea: weakest?.name || "discipline",
-    personalizedRecommendations: getRecommendations(weakest?.name),
-    topAchievements: [],
-    statsSnapshot,
-    averageMood: Math.round(avgMood * 10) / 10,
-    bossesDefeated,
-    shadowsEvolved,
-    level: hunter?.level,
-    rank: hunter?.rank,
-  });
-
-  await createNotification(
-    userId,
-    "weeklyReport",
-    "WEEKLY HUNTER REPORT",
-    `Your weekly performance report is ready. Trend: ${productivityTrend.toUpperCase()}. Quest completion: ${Math.round(completionRate * 100)}%.`,
-    { reportId: report._id },
-    io,
+  const report = await HunterReport.findOneAndUpdate(
+    { userId, weekStart },
+    {
+      $set: {
+        weekEnd,
+        periodVersion: 2,
+        mostImprovedStat: mostImproved?.name || "N/A",
+        mostImprovedStatDelta: mostImproved?.delta || 0,
+        weakestStat: weakest?.name || "N/A",
+        weakestStatValue: weakest?.current || 0,
+        productivityTrend,
+        streakPerformance: hunter?.currentStreak || 0,
+        questCompletionRate: completionRate,
+        totalQuestsAssigned: assigned,
+        totalQuestsCompleted: completed,
+        totalXPEarned: totalXP,
+        totalFocusMinutes: totalFocus,
+        suggestedFocusArea: weakest?.name || "discipline",
+        personalizedRecommendations: getRecommendations(weakest?.name),
+        topAchievements: [],
+        statsSnapshot,
+        averageMood: Math.round(avgMood * 10) / 10,
+        bossesDefeated,
+        shadowsEvolved,
+        level: hunter?.level,
+        rank: hunter?.rank,
+      },
+    },
+    { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
   );
+
+  if (!existing || existing.periodVersion !== 2) {
+    await createNotification(
+      userId,
+      "weeklyReport",
+      "WEEKLY HUNTER REPORT",
+      `Your previous-week performance report is ready. Trend: ${productivityTrend.toUpperCase()}. Quest completion: ${Math.round(completionRate * 100)}%.`,
+      { reportId: report._id },
+      io,
+    );
+  }
 
   return report;
 };
 
 export const getWeeklyReport = async (userId) => {
-  const weekStart = startOfWeek();
-  const report = await HunterReport.findOne({ userId, weekStart });
+  const currentWeekStart = startOfWeek();
+  const weekStart = new Date(currentWeekStart.getTime() - 7 * 24 * 3600 * 1000);
+  const report = await HunterReport.findOne({ userId, weekStart, periodVersion: 2 });
   if (!report)
     throw new AppError(
-      "No report for this week yet. Check back after Sunday.",
+      "No report for the previous completed week yet. Generate one from Settings.",
       404,
     );
   return report;

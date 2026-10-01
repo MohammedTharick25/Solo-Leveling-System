@@ -13,7 +13,7 @@ export const chat = asyncHandler(async (req, res) => {
 });
 
 export const nextAction = asyncHandler(async (req, res) => {
-  const result = await aiService.nextAction(req.userId);
+  const result = await aiService.nextAction(req.userId, req.body?.goalId || null);
   sendSuccess(res, result, "Next action generated.");
 });
 

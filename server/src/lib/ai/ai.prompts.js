@@ -89,6 +89,7 @@ Answer the user directly. Use their actual context. Format the answer for easy r
 
 export const buildNextActionPrompt = (context) => `
 Based on this user's current data, choose the single most useful next action they can complete in 15-60 minutes.
+If selectedGoal is present, work only toward that goal. Prefer an unfinished active quest linked to it and use the quest title exactly. Otherwise prefer an unfinished active quest linked to any active goal and name that goal in the reason. If no goal-linked quest is active, use the next incomplete milestone from an active goal to suggest a practical first step. Keep the suggested workload small when recent focus or energy data is low.
 Return JSON only with this shape:
 {
   "title": "short action title",
