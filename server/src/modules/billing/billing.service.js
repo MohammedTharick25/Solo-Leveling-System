@@ -116,6 +116,7 @@ export const getPlans = async () => {
 };
 
 const getEffectiveTier = (billing) => {
+  if (billing?.tier === "monarch" && billing.upgradeAccessUntil?.getTime() > Date.now()) return "monarch";
   if (
     billing?.provider === "razorpay" &&
     billing.status === "active" &&
@@ -133,7 +134,10 @@ export const getBillingStatus = async (userId) => {
   const billing = user.billing || {};
 
   // Refresh provider state as a fallback if the webhook is delayed or was unavailable.
-  if (billing.razorpaySubscriptionId && hasRazorpayCredentials()) {
+  if (
+    billing.razorpaySubscriptionId && hasRazorpayCredentials() &&
+    !(billing.status === "cancelled" && billing.upgradeAccessUntil > new Date())
+  ) {
     try {
       const providerSubscription = await razorpayRequest(
         `/subscriptions/${encodeURIComponent(billing.razorpaySubscriptionId)}`,
@@ -153,7 +157,7 @@ const toBillingStatus = (user, billing = {}) => {
   const activePaidPlan = billing.provider === "razorpay" && billing.status === "active" &&
     (!billing.currentPeriodEnd || billing.currentPeriodEnd.getTime() > Date.now());
   const isTrialing = Boolean(!activePaidPlan && billing.trialEndsAt && billing.trialEndsAt.getTime() > Date.now());
-  const accessEnd = isTrialing ? billing.trialEndsAt : billing.currentPeriodEnd;
+  const accessEnd = isTrialing ? billing.trialEndsAt : billing.upgradeAccessUntil || billing.currentPeriodEnd;
   return {
   tier: billing.tier || "free",
   effectiveTier,
@@ -167,8 +171,15 @@ const toBillingStatus = (user, billing = {}) => {
       : 0,
   status: billing.status || "inactive",
   provider: billing.provider || null,
+  currentPeriodStart: billing.currentPeriodStart || null,
   currentPeriodEnd: billing.currentPeriodEnd || null,
   cancelAtCycleEnd: Boolean(billing.cancelAtCycleEnd),
+  pendingTier: billing.pendingTier || null,
+  pendingTierEffectiveAt: billing.pendingTierEffectiveAt || null,
+  upgradeAccessUntil: billing.upgradeAccessUntil || null,
+  upgradeCreditAmount: billing.upgradeCreditAmount ?? null,
+  upgradeConvertedDays: billing.upgradeConvertedDays ?? null,
+  upgradePendingSubscriptionId: billing.upgradePendingSubscriptionId || null,
   subscriptionId: billing.razorpaySubscriptionId || null,
   email: user.email,
   keyId: config.RAZORPAY_KEY_ID || null,
@@ -213,29 +224,112 @@ export const chooseFreePlan = async (userId) => {
 };
 
 export const upgradeToMonarch = async (userId) => {
-  const user = await User.findById(userId).select("billing");
+  assertRazorpayConfigured();
+  const user = await User.findById(userId).select("billing email");
   const billing = user?.billing || {};
   if (!user || billing.tier !== "hunter" || billing.status !== "active" || !billing.razorpaySubscriptionId) {
     throw new AppError("Only an active Hunter subscription can be upgraded to Monarch.", 409);
   }
-  if (billing.cancelAtCycleEnd) {
-    throw new AppError("Resume your scheduled cancellation before upgrading.", 409);
+  if (billing.cancelAtCycleEnd) throw new AppError("Resume your scheduled cancellation before upgrading.", 409);
+  if (billing.upgradePendingSubscriptionId) {
+    return {
+      subscriptionId: billing.upgradePendingSubscriptionId,
+      keyId: config.RAZORPAY_KEY_ID,
+      email: user.email,
+      tier: "monarch",
+      creditAmount: billing.upgradePendingCreditAmount || 0,
+      currency: "INR",
+      accessUntil: billing.upgradePendingAccessUntil,
+      convertedDays: billing.upgradePendingAccessUntil
+        ? billing.upgradePendingConvertedDays || 0
+        : 0,
+    };
   }
   const planId = PLAN_DEFINITIONS.monarch.razorpayPlanId();
-  if (!planId) throw new AppError("Monarch is not configured in Razorpay yet.", 503);
+  const hunterPlanId = PLAN_DEFINITIONS.hunter.razorpayPlanId();
+  if (!planId || !hunterPlanId) throw new AppError("Both paid plans must be configured in Razorpay before upgrading.", 503);
   const claim = await User.updateOne(
-    { _id: userId, "billing.tier": "hunter", "billing.status": "active", "billing.upgradePending": { $ne: true }, "billing.cancelAtCycleEnd": { $ne: true } },
+    { _id: userId, "billing.tier": "hunter", "billing.status": "active", "billing.upgradePending": { $ne: true }, "billing.upgradePendingSubscriptionId": null, "billing.cancelAtCycleEnd": { $ne: true } },
     { $set: { "billing.upgradePending": true } },
   );
   if (!claim.modifiedCount) throw new AppError("Your plan is already changing. Refresh billing and try again.", 409);
   try {
-    const subscription = await razorpayRequest(`/subscriptions/${encodeURIComponent(billing.razorpaySubscriptionId)}`, {
-      method: "PATCH",
-      body: { plan_id: planId, schedule_change_at: "now", customer_notify: true },
+    const existingSubscription = await razorpayRequest(`/subscriptions/${encodeURIComponent(billing.razorpaySubscriptionId)}`);
+    if (existingSubscription.has_scheduled_changes) {
+      await razorpayRequest(`/subscriptions/${encodeURIComponent(billing.razorpaySubscriptionId)}/cancel_scheduled_changes`, { method: "POST" });
+    }
+    if (billing.pendingTier) await User.updateOne({ _id: userId }, { $set: { "billing.pendingTier": null, "billing.pendingTierEffectiveAt": null } });
+    const currentPeriodStart = existingSubscription.current_start
+      ? new Date(existingSubscription.current_start * 1000)
+      : billing.currentPeriodStart;
+    const currentPeriodEnd = existingSubscription.current_end
+      ? new Date(existingSubscription.current_end * 1000)
+      : billing.currentPeriodEnd;
+    if (!currentPeriodStart || !currentPeriodEnd || currentPeriodEnd <= new Date() || currentPeriodEnd <= currentPeriodStart) {
+      throw new AppError("We could not determine the remaining Hunter time. Refresh billing and try again.", 409);
+    }
+    const [hunterPlan, monarchPlan] = await Promise.all([
+      razorpayRequest(`/plans/${encodeURIComponent(hunterPlanId)}`),
+      razorpayRequest(`/plans/${encodeURIComponent(planId)}`),
+    ]);
+    const hunterAmount = Number(hunterPlan.item?.amount);
+    const monarchAmount = Number(monarchPlan.item?.amount);
+    const hunterCurrency = hunterPlan.item?.currency || "INR";
+    const monarchCurrency = monarchPlan.item?.currency || "INR";
+    if (!Number.isFinite(hunterAmount) || !Number.isFinite(monarchAmount) || hunterAmount <= 0 || monarchAmount <= 0) {
+      throw new AppError("Razorpay returned invalid plan pricing. Contact support before upgrading.", 503);
+    }
+    if (hunterCurrency !== monarchCurrency) throw new AppError("Hunter and Monarch plans must use the same currency for time-credit upgrades.", 409);
+    if (hunterPlan.period !== "monthly" || monarchPlan.period !== "monthly" || hunterPlan.interval !== 1 || monarchPlan.interval !== 1) {
+      throw new AppError("Converted-time upgrades currently require both plans to bill monthly.", 409);
+    }
+
+    const now = new Date();
+    const periodStart = currentPeriodStart.getTime();
+    const periodEnd = currentPeriodEnd.getTime();
+    const periodMs = periodEnd - periodStart;
+    const remainingMs = Math.max(0, periodEnd - now.getTime());
+    const creditAmount = Math.min(hunterAmount, Math.floor(hunterAmount * remainingMs / periodMs));
+    const nextMonth = new Date(now);
+    const originalDay = nextMonth.getUTCDate();
+    nextMonth.setUTCDate(1);
+    nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+    const lastDayOfNextMonth = new Date(Date.UTC(nextMonth.getUTCFullYear(), nextMonth.getUTCMonth() + 1, 0)).getUTCDate();
+    nextMonth.setUTCDate(Math.min(originalDay, lastDayOfNextMonth));
+    const monarchCycleMs = nextMonth.getTime() - now.getTime();
+    const convertedMs = Math.floor(monarchCycleMs * creditAmount / monarchAmount);
+    const accessUntil = new Date(now.getTime() + convertedMs);
+    const startAt = Math.ceil(accessUntil.getTime() / 1000);
+
+    const subscription = await razorpayRequest("/subscriptions", {
+      method: "POST",
+      body: {
+        plan_id: planId,
+        total_count: 120,
+        quantity: 1,
+        start_at: startAt,
+        customer_notify: true,
+        notes: { userId: String(userId), tier: "monarch", upgradeFrom: billing.razorpaySubscriptionId },
+      },
     });
-    await applyProviderSubscription(subscription, userId);
-    await User.updateOne({ _id: userId }, { $set: { "billing.tier": "monarch", "billing.razorpayPlanId": planId } });
-    return getBillingStatus(userId);
+    await User.updateOne({ _id: userId }, { $set: {
+      "billing.upgradePendingSubscriptionId": subscription.id,
+      "billing.upgradePendingOldSubscriptionId": billing.razorpaySubscriptionId,
+      "billing.upgradePendingAccessUntil": accessUntil,
+      "billing.upgradePendingCreditAmount": creditAmount,
+      "billing.upgradePendingConvertedDays": convertedMs / 86400000,
+      "billing.upgradePending": false,
+    } });
+    return {
+      subscriptionId: subscription.id,
+      keyId: config.RAZORPAY_KEY_ID,
+      email: user.email,
+      tier: "monarch",
+      creditAmount,
+      currency: monarchCurrency,
+      accessUntil,
+      convertedDays: convertedMs / 86400000,
+    };
   } finally {
     await User.updateOne({ _id: userId }, { $set: { "billing.upgradePending": false } });
   }
@@ -320,10 +414,7 @@ const safeEqualHex = (left, right) => {
 
 export const verifyCheckout = async (userId, { subscriptionId, paymentId, signature }) => {
   assertRazorpayConfigured();
-  const user = await User.findOne({
-    _id: userId,
-    "billing.razorpaySubscriptionId": subscriptionId,
-  }).select("billing");
+  const user = await User.findById(userId).select("billing email");
   if (!user) throw new AppError("This subscription does not belong to your account.", 404);
 
   const expected = createHmac("sha256", config.RAZORPAY_KEY_SECRET)
@@ -331,6 +422,76 @@ export const verifyCheckout = async (userId, { subscriptionId, paymentId, signat
     .digest("hex");
   if (!safeEqualHex(expected, signature)) {
     throw new AppError("Razorpay payment verification failed.", 400);
+  }
+
+  if (user.billing?.upgradePendingSubscriptionId === subscriptionId) {
+    const upgradeSubscription = await razorpayRequest(`/subscriptions/${encodeURIComponent(subscriptionId)}`);
+    if (upgradeSubscription.plan_id !== PLAN_DEFINITIONS.monarch.razorpayPlanId() || upgradeSubscription.notes?.userId !== String(userId)) {
+      throw new AppError("The Monarch upgrade subscription could not be verified.", 400);
+    }
+    if (!["authenticated", "active"].includes(upgradeSubscription.status)) {
+      throw new AppError("Razorpay has not confirmed the new payment mandate yet. Try again shortly.", 409);
+    }
+
+    const oldSubscriptionId = user.billing.upgradePendingOldSubscriptionId;
+    if (!oldSubscriptionId || oldSubscriptionId !== user.billing.razorpaySubscriptionId) {
+      throw new AppError("Your Hunter subscription changed during this upgrade. Refresh billing and try again.", 409);
+    }
+    try {
+      await razorpayRequest(`/subscriptions/${encodeURIComponent(oldSubscriptionId)}/cancel`, {
+        method: "POST",
+        body: { cancel_at_cycle_end: false },
+      });
+    } catch {
+      let stagedSubscriptionCancelled = false;
+      try {
+        await razorpayRequest(`/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`, {
+          method: "POST",
+          body: { cancel_at_cycle_end: false },
+        });
+        stagedSubscriptionCancelled = true;
+      } catch (cleanupError) {
+        console.error("[BILLING] Could not cancel the staged Monarch subscription after Hunter cancellation failed", cleanupError.message);
+      }
+      if (stagedSubscriptionCancelled) await User.updateOne({ _id: userId, "billing.upgradePendingSubscriptionId": subscriptionId }, { $set: {
+        "billing.upgradePendingSubscriptionId": null,
+        "billing.upgradePendingOldSubscriptionId": null,
+        "billing.upgradePendingAccessUntil": null,
+        "billing.upgradePendingCreditAmount": null,
+        "billing.upgradePendingConvertedDays": null,
+        "billing.upgradePending": false,
+      } });
+      throw new AppError("We could not safely replace your Hunter subscription. No plan change was applied; contact support if Razorpay shows a new mandate.", 502);
+    }
+
+    const accessUntil = user.billing.upgradePendingAccessUntil;
+    await User.updateOne({ _id: userId, "billing.upgradePendingSubscriptionId": subscriptionId }, { $set: {
+      "billing.tier": "monarch",
+      "billing.status": upgradeSubscription.status,
+      "billing.provider": "razorpay",
+      "billing.razorpaySubscriptionId": subscriptionId,
+      "billing.razorpayPlanId": upgradeSubscription.plan_id,
+      "billing.lastPaymentId": paymentId,
+      "billing.currentPeriodStart": new Date(),
+      "billing.currentPeriodEnd": accessUntil,
+      "billing.upgradeAccessUntil": accessUntil,
+      "billing.upgradeCreditAmount": user.billing.upgradePendingCreditAmount || 0,
+      "billing.upgradeConvertedDays": user.billing.upgradePendingConvertedDays || 0,
+      "billing.cancelAtCycleEnd": false,
+      "billing.pendingTier": null,
+      "billing.pendingTierEffectiveAt": null,
+      "billing.upgradePendingSubscriptionId": null,
+      "billing.upgradePendingOldSubscriptionId": null,
+      "billing.upgradePendingAccessUntil": null,
+      "billing.upgradePendingCreditAmount": null,
+      "billing.upgradePendingConvertedDays": null,
+      "billing.upgradePending": false,
+    } });
+    return getBillingStatus(userId);
+  }
+
+  if (user.billing?.razorpaySubscriptionId !== subscriptionId) {
+    throw new AppError("This subscription does not belong to your account.", 404);
   }
 
   const providerSubscription = await razorpayRequest(
@@ -346,11 +507,41 @@ export const cancelSubscription = async (userId, atCycleEnd = true) => {
   if (!user?.billing?.razorpaySubscriptionId) {
     throw new AppError("There is no Razorpay subscription to cancel.", 404);
   }
+  if (user.billing.upgradePendingSubscriptionId) {
+    await razorpayRequest(`/subscriptions/${encodeURIComponent(user.billing.upgradePendingSubscriptionId)}/cancel`, {
+      method: "POST", body: { cancel_at_cycle_end: false },
+    });
+    await User.updateOne({ _id: userId }, { $set: {
+      "billing.upgradePendingSubscriptionId": null,
+      "billing.upgradePendingOldSubscriptionId": null,
+      "billing.upgradePendingAccessUntil": null,
+      "billing.upgradePendingCreditAmount": null,
+      "billing.upgradePendingConvertedDays": null,
+    } });
+  }
+  if (user.billing.upgradeAccessUntil && user.billing.upgradeAccessUntil > new Date()) {
+    const subscription = await razorpayRequest(
+      `/subscriptions/${encodeURIComponent(user.billing.razorpaySubscriptionId)}/cancel`,
+      { method: "POST", body: { cancel_at_cycle_end: false } },
+    );
+    await applyProviderSubscription(subscription, userId);
+    await User.updateOne({ _id: userId }, { $set: {
+      "billing.tier": "monarch",
+      "billing.status": "cancelled",
+      "billing.currentPeriodEnd": user.billing.upgradeAccessUntil,
+      "billing.upgradeAccessUntil": user.billing.upgradeAccessUntil,
+      "billing.cancelAtCycleEnd": true,
+    } });
+    return getBillingStatus(userId);
+  }
   const subscription = await razorpayRequest(
     `/subscriptions/${encodeURIComponent(user.billing.razorpaySubscriptionId)}/cancel`,
     { method: "POST", body: { cancel_at_cycle_end: Boolean(atCycleEnd) } },
   );
   await applyProviderSubscription(subscription, userId);
+  if (atCycleEnd) {
+    await User.updateOne({ _id: userId }, { $set: { "billing.pendingTier": null, "billing.pendingTierEffectiveAt": null } });
+  }
   return getBillingStatus(userId);
 };
 
@@ -387,15 +578,36 @@ const applyProviderSubscription = async (subscription, userId = null) => {
   };
   if (subscription.plan_id) {
     update["billing.razorpayPlanId"] = subscription.plan_id;
-    if (subscription.plan_id === PLAN_DEFINITIONS.monarch.razorpayPlanId()) update["billing.tier"] = "monarch";
+    if (subscription.plan_id === PLAN_DEFINITIONS.monarch.razorpayPlanId()) {
+      update["billing.tier"] = "monarch";
+      update["billing.pendingTier"] = null;
+      update["billing.pendingTierEffectiveAt"] = null;
+    }
     if (subscription.plan_id === PLAN_DEFINITIONS.hunter.razorpayPlanId()) update["billing.tier"] = "hunter";
   }
-  if (terminal) update["billing.tier"] = "free";
-  return User.updateOne(
-    {
-      "billing.razorpaySubscriptionId": subscription.id,
-      ...(userId ? { _id: userId } : {}),
-    },
-    { $set: update },
-  );
+  if (status === "active" && subscription.current_start) update["billing.upgradeAccessUntil"] = null;
+  const filter = {
+    "billing.razorpaySubscriptionId": subscription.id,
+    ...(userId ? { _id: userId } : {}),
+  };
+  const result = await User.updateOne(filter, { $set: update });
+  if (terminal) {
+    await User.updateOne({
+      ...filter,
+      "billing.upgradeAccessUntil": { $gt: new Date() },
+    }, { $set: { "billing.cancelAtCycleEnd": true } });
+    await User.updateOne({
+      ...filter,
+      $or: [
+        { "billing.upgradeAccessUntil": null },
+        { "billing.upgradeAccessUntil": { $lte: new Date() } },
+      ],
+    }, { $set: {
+      "billing.tier": "free",
+      "billing.pendingTier": null,
+      "billing.pendingTierEffectiveAt": null,
+      "billing.upgradeAccessUntil": null,
+    } });
+  }
+  return result;
 };

@@ -67,6 +67,14 @@ const userSchema = new mongoose.Schema(
       trialUsedAt: { type: Date, default: null },
       planChosenAt: { type: Date, default: null },
       upgradePending: { type: Boolean, default: false },
+      upgradePendingSubscriptionId: { type: String, default: null },
+      upgradePendingOldSubscriptionId: { type: String, default: null },
+      upgradePendingAccessUntil: { type: Date, default: null },
+      upgradePendingCreditAmount: { type: Number, default: null },
+      upgradePendingConvertedDays: { type: Number, default: null },
+      upgradeAccessUntil: { type: Date, default: null },
+      upgradeCreditAmount: { type: Number, default: null },
+      upgradeConvertedDays: { type: Number, default: null },
       status: {
         type: String,
         enum: ["inactive", "created", "authenticated", "active", "pending", "halted", "cancelled", "completed", "expired"],
@@ -79,6 +87,8 @@ const userSchema = new mongoose.Schema(
       currentPeriodStart: { type: Date, default: null },
       currentPeriodEnd: { type: Date, default: null },
       cancelAtCycleEnd: { type: Boolean, default: false },
+      pendingTier: { type: String, enum: ["hunter", "monarch", null], default: null },
+      pendingTierEffectiveAt: { type: Date, default: null },
     },
     settings: {
       notifications: {

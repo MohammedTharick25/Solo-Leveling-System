@@ -38,7 +38,7 @@ export const chooseFreePlan = asyncHandler(async (req, res) => {
 });
 
 export const upgradeToMonarch = asyncHandler(async (req, res) => {
-  sendSuccess(res, { billing: await billingService.upgradeToMonarch(req.userId) }, "Subscription upgraded to Monarch.");
+  sendSuccess(res, { upgrade: await billingService.upgradeToMonarch(req.userId) }, "Monarch upgrade checkout prepared with converted Hunter time.");
 });
 
 export const handleWebhook = asyncHandler(async (req, res) => {

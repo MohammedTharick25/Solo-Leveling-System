@@ -11,7 +11,8 @@ export const requirePlan = (minimumTier = "hunter") => async (req, _res, next) =
     const billing = user.billing || {};
     const periodIsValid = !billing.currentPeriodEnd || billing.currentPeriodEnd.getTime() > Date.now();
     const trialIsValid = billing.trialEndsAt && billing.trialEndsAt.getTime() > Date.now();
-    const activeTier = trialIsValid
+    const convertedCreditIsValid = billing.tier === "monarch" && billing.upgradeAccessUntil && billing.upgradeAccessUntil.getTime() > Date.now();
+    const activeTier = trialIsValid || convertedCreditIsValid
       ? "monarch"
       : billing.provider === "razorpay" && billing.status === "active" && periodIsValid
         ? billing.tier

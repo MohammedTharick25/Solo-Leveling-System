@@ -32,6 +32,24 @@ const formatAmount = (billing) => {
   }).format(billing.amount / 100);
 };
 
+const formatPreciseAmount = (amount, currency = "INR") => new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency,
+  maximumFractionDigits: 2,
+}).format((amount || 0) / 100);
+
+const formatExactDuration = (milliseconds) => {
+  const totalMinutes = Math.max(0, Math.floor(milliseconds / 60_000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  return [
+    days ? `${days} ${days === 1 ? "day" : "days"}` : null,
+    hours ? `${hours} ${hours === 1 ? "hour" : "hours"}` : null,
+    minutes ? `${minutes} ${minutes === 1 ? "minute" : "minutes"}` : null,
+  ].filter(Boolean).join(", ") || "less than a minute";
+};
+
 const periodLabel = (billing) => {
   if (!billing?.interval) return "";
   const names = { daily: "day", weekly: "week", monthly: "month", yearly: "year" };
@@ -147,12 +165,47 @@ export default function BillingPage() {
   });
 
   const upgradeMutation = useMutation({
-    mutationFn: async () => (await api.post("/billing/upgrade")).data.data.billing,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["billing-me"] });
-      setMessage({ type: "success", text: "Your Monarch upgrade is active. Razorpay applied the prorated billing adjustment." });
+    mutationFn: async () => {
+      const response = await api.post("/billing/upgrade");
+      const upgrade = response.data.data.upgrade;
+      setMessage({ type: "info", text: `Hunter credit of ${formatPreciseAmount(upgrade.creditAmount, upgrade.currency)} gives you ${formatExactDuration(upgrade.convertedDays * 86400000)} of additional Monarch access. Your first full Monarch payment is scheduled for ${new Date(upgrade.accessUntil).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}.` });
+      const loaded = await loadRazorpayCheckout();
+      if (!loaded || !window.Razorpay) throw new Error("Razorpay Checkout could not be loaded. Check your internet connection and try again.");
+      return new Promise((resolve, reject) => {
+        const checkout = new window.Razorpay({
+          key: upgrade.keyId,
+          subscription_id: upgrade.subscriptionId,
+          name: "Solo Leveling System",
+          description: `Monarch upgrade with ${formatExactDuration(upgrade.convertedDays * 86400000)} converted`,
+          prefill: { email: upgrade.email },
+          theme: { color: "#a78bfa" },
+          handler: async (payment) => {
+            try {
+              const verified = await api.post("/billing/verify", payment);
+              resolve({ billing: verified.data.data.billing, upgrade });
+            } catch (error) {
+              reject(error);
+            }
+          },
+          modal: { ondismiss: () => resolve(null) },
+        });
+        checkout.on("payment.failed", (event) => reject(new Error(event.error?.description || "Razorpay payment authorization failed.")));
+        checkout.open();
+      });
     },
-    onError: (error) => setMessage({ type: "error", text: error.response?.data?.message || "Could not upgrade your plan." }),
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ["billing-me"] });
+      if (result === null) {
+        setMessage({ type: "info", text: "Upgrade checkout was closed. Your Hunter plan is unchanged, and you can continue the Monarch upgrade here." });
+        return;
+      }
+      const date = new Date(result.upgrade.accessUntil).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+      setMessage({ type: "success", text: `Monarch is active now. ${formatExactDuration(result.upgrade.convertedDays * 86400000)} of Hunter value was converted to Monarch access. Your first full Monarch payment is scheduled for ${date}.` });
+    },
+    onError: async (error) => {
+      await queryClient.invalidateQueries({ queryKey: ["billing-me"] });
+      setMessage({ type: "error", text: error.response?.data?.message || "Could not upgrade your plan." });
+    },
   });
 
   const freePlanMutation = useMutation({
@@ -165,11 +218,33 @@ export default function BillingPage() {
   });
 
   const plans = plansQuery.data?.plans || [];
+  const upgradePreview = useMemo(() => {
+    if (billing.effectiveTier !== "hunter" || billing.status !== "active" || billing.cancelAtCycleEnd || !billing.currentPeriodStart || !billing.currentPeriodEnd) return null;
+    const hunterAmount = Number(plans.find((plan) => plan.id === "hunter")?.billing?.amount);
+    const monarchAmount = Number(plans.find((plan) => plan.id === "monarch")?.billing?.amount);
+    const periodStart = new Date(billing.currentPeriodStart).getTime();
+    const periodEnd = new Date(billing.currentPeriodEnd).getTime();
+    const now = Date.now();
+    const periodLength = periodEnd - periodStart;
+    if (!Number.isFinite(hunterAmount) || !Number.isFinite(monarchAmount) || hunterAmount <= 0 || monarchAmount <= 0 || periodLength <= 0 || periodEnd <= now) return null;
+    const creditAmount = Math.min(hunterAmount, Math.floor(hunterAmount * (periodEnd - now) / periodLength));
+    const nextMonth = new Date(now);
+    const day = nextMonth.getUTCDate();
+    nextMonth.setUTCDate(1);
+    nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+    const lastDay = new Date(Date.UTC(nextMonth.getUTCFullYear(), nextMonth.getUTCMonth() + 1, 0)).getUTCDate();
+    nextMonth.setUTCDate(Math.min(day, lastDay));
+    const extraMilliseconds = Math.floor((nextMonth.getTime() - now) * creditAmount / monarchAmount);
+    return { creditAmount, extraMilliseconds, firstPaymentAt: new Date(now + extraMilliseconds) };
+  }, [billing.effectiveTier, billing.status, billing.cancelAtCycleEnd, billing.currentPeriodStart, billing.currentPeriodEnd, plans]);
   const planIcon = useMemo(() => ({ free: ShieldCheck, hunter: Sparkles, monarch: Crown }), []);
   const isBusy = checkoutMutation.isPending || cancelMutation.isPending || trialMutation.isPending || upgradeMutation.isPending || freePlanMutation.isPending;
   const accessEnd = billing.isTrialing ? billing.trialEndsAt : billing.currentPeriodEnd;
   const daysRemaining = billing.daysRemaining || 0;
   const formattedAccessEnd = accessEnd ? new Date(accessEnd).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null;
+  const pendingTierDate = billing.pendingTierEffectiveAt
+    ? new Date(billing.pendingTierEffectiveAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+    : formattedAccessEnd;
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mx-auto max-w-6xl space-y-8 pb-16">
@@ -202,6 +277,8 @@ export default function BillingPage() {
 
       {billing.isTrialing && <div className="flex flex-col gap-4 rounded-2xl border border-violet-300/20 bg-gradient-to-r from-violet-400/[0.09] to-cyan-300/[0.05] p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-300/10 text-violet-200"><CalendarDays size={18} /></span><div><p className="text-sm font-bold text-white">Your Monarch trial is in progress</p><p className="mt-1 text-xs leading-5 text-slate-400">You have {daysRemaining} {daysRemaining === 1 ? "day" : "days"} left. Your account returns to Free when the trial ends unless you subscribe.</p></div></div><button type="button" onClick={() => checkoutMutation.mutate("monarch")} disabled={isBusy} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-violet-200 px-4 text-xs font-black text-slate-950 hover:bg-violet-100 disabled:opacity-50">Continue with Monarch <ArrowUpRight size={14} /></button></div>}
 
+      {billing.pendingTier === "monarch" && <div className="flex flex-col gap-3 rounded-2xl border border-violet-300/20 bg-gradient-to-r from-violet-400/[0.09] to-cyan-300/[0.05] p-5 sm:flex-row sm:items-start"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-300/10 text-violet-200"><CalendarDays size={18} /></span><div><p className="text-sm font-bold text-white">Monarch is scheduled{pendingTierDate ? ` for ${pendingTierDate}` : " for your next renewal"}</p><p className="mt-1 text-xs leading-5 text-slate-400">Hunter features stay active through your current billing period. Monarch begins when it renews; there is no immediate upgrade charge.</p></div></div>}
+
       {message && <div role={message.type === "error" ? "alert" : "status"} className={`rounded-xl border px-4 py-3 text-sm ${message.type === "error" ? "border-red-500/20 bg-red-500/5 text-red-300" : message.type === "success" ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300" : "border-cyan-500/20 bg-cyan-500/5 text-cyan-200"}`}>{message.text}</div>}
 
       {plansQuery.isLoading ? <div className="skeleton h-72 rounded-[26px]" /> : plansQuery.isError ? (
@@ -216,7 +293,7 @@ export default function BillingPage() {
             return (
               <article key={plan.id} className={`relative flex flex-col rounded-[26px] border bg-slate-950/70 p-5 shadow-xl transition duration-300 hover:-translate-y-1 hover:bg-slate-900/80 sm:p-6 ${plan.id === "monarch" ? "border-violet-300/25 shadow-violet-500/10" : featured ? "border-cyan-300/35 shadow-cyan-500/10" : current ? "border-emerald-300/25" : "border-white/[0.08]"}`}>
                 {featured && <span className="absolute right-4 top-4 rounded-full bg-cyan-300 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.16em] text-slate-950">Most popular</span>}
-                {plan.id === "monarch" && <span className="absolute right-4 top-4 rounded-full border border-violet-200/20 bg-violet-300/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.16em] text-violet-100">Complete access</span>}
+                {plan.id === "monarch" && <span className="absolute right-4 top-4 rounded-full border border-violet-200/20 bg-violet-300/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.16em] text-violet-100">{billing.pendingTier === "monarch" ? "Scheduled" : "Complete access"}</span>}
                 <div className="flex items-center justify-between">
                   <span className={`rounded-xl border p-3 ${featured ? "border-cyan-300/20 bg-cyan-300/10 text-cyan-200" : "border-white/10 bg-white/5 text-slate-300"}`}><Icon size={19} /></span>
                   {current && <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-emerald-200">Your plan</span>}
@@ -236,11 +313,11 @@ export default function BillingPage() {
                   <button
                     type="button"
                     onClick={() => { setMessage(null); if (plan.id === "monarch" && billing.effectiveTier === "hunter" && billing.status === "active") upgradeMutation.mutate(); else checkoutMutation.mutate(plan.id); }}
-                    disabled={isBusy || billingQuery.isLoading || billingQuery.isError || current || (billing.effectiveTier === "monarch" && plan.id === "hunter") || (hasOpenSubscription && !resumable && !(plan.id === "monarch" && billing.effectiveTier === "hunter" && billing.status === "active")) || (!plan.available && !resumable)}
+                    disabled={isBusy || billingQuery.isLoading || billingQuery.isError || current || (billing.pendingTier === plan.id && !(plan.id === "monarch" && billing.effectiveTier === "hunter" && billing.status === "active")) || (billing.effectiveTier === "monarch" && plan.id === "hunter") || (hasOpenSubscription && !resumable && !(plan.id === "monarch" && billing.effectiveTier === "hunter" && billing.status === "active")) || (!plan.available && !resumable)}
                     className={`mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-45 ${featured ? "bg-cyan-300 text-slate-950 hover:bg-cyan-200" : "border border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]"}`}
                   >
                     {(checkoutMutation.isPending && checkoutMutation.variables === plan.id || upgradeMutation.isPending && plan.id === "monarch") && <Loader2 size={14} className="animate-spin" />}
-                    {current ? "Current plan" : billing.effectiveTier === "monarch" && plan.id === "hunter" ? "Downgrade unavailable" : billing.effectiveTier === "hunter" && billing.status === "active" && plan.id === "monarch" ? "Upgrade with prorated billing" : resumable ? "Continue checkout" : hasOpenSubscription ? "Resolve current subscription first" : plan.available ? `Choose ${plan.name}` : "Razorpay setup needed"}
+                    {billing.pendingTier === plan.id && !(plan.id === "monarch" && billing.effectiveTier === "hunter" && billing.status === "active") ? "Monarch scheduled" : current ? "Current plan" : billing.effectiveTier === "monarch" && plan.id === "hunter" ? "Downgrade unavailable" : billing.effectiveTier === "hunter" && billing.status === "active" && plan.id === "monarch" ? "Upgrade now with time credit" : resumable ? "Continue checkout" : hasOpenSubscription ? "Resolve current subscription first" : plan.available ? `Choose ${plan.name}` : "Razorpay setup needed"}
                   </button>
                   {plan.id === "free" ? null : billing.effectiveTier === "monarch" && plan.id === "hunter" ? <p className="mt-2 text-center text-[10px] leading-4 text-slate-500">Downgrades are available after your Monarch period ends.</p> : null}
                   </>
@@ -250,6 +327,8 @@ export default function BillingPage() {
           })}
         </section>
       )}
+
+      {upgradePreview && <section className="relative overflow-hidden rounded-3xl border border-violet-300/20 bg-gradient-to-r from-violet-500/[0.12] via-slate-950/85 to-cyan-500/[0.08] p-5 sm:p-6"><div className="pointer-events-none absolute -right-12 -top-20 h-48 w-48 rounded-full bg-violet-300/10 blur-3xl" /><div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-200">Hunter to Monarch conversion</p><p className="mt-2 text-sm font-bold text-white">Your unused Hunter value becomes extra Monarch time.</p><p className="mt-1 text-xs leading-5 text-slate-400">{formatPreciseAmount(upgradePreview.creditAmount, plans.find((plan) => plan.id === "hunter")?.billing?.currency)} credit adds <strong className="text-violet-100">{formatExactDuration(upgradePreview.extraMilliseconds)}</strong>. Monarch access starts after authorization; your first full payment is scheduled for {upgradePreview.firstPaymentAt.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}.</p></div><span className="inline-flex w-fit shrink-0 items-center gap-2 rounded-xl border border-violet-200/15 bg-violet-300/[0.08] px-3 py-2 text-[10px] font-bold text-violet-100"><CalendarDays size={14} /> Hunter member benefit</span></div></section>}
 
       <section className="grid gap-4 rounded-3xl border border-white/[0.07] bg-slate-950/45 p-5 sm:grid-cols-3 sm:p-6">
         {[
