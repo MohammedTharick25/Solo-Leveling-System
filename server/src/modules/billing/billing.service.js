@@ -49,7 +49,11 @@ const razorpayRequest = async (path, { method = "GET", body } = {}) => {
   if (!response.ok) {
     const message = payload?.error?.description || "Razorpay could not process the billing request.";
     console.error(`[BILLING] Razorpay request failed (${response.status})`, {
+      requestId: response.headers.get("x-razorpay-request-id") || response.headers.get("x-rzp-trace-id") || null,
       code: payload?.error?.code,
+      source: payload?.error?.source,
+      step: payload?.error?.step,
+      reason: payload?.error?.reason,
       message,
     });
     throw new AppError(message, response.status >= 500 ? 502 : 400);
