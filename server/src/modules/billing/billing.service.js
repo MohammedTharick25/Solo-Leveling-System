@@ -172,7 +172,7 @@ export const createSubscription = async (userId, tier) => {
     method: "POST",
     body: {
       plan_id: planId,
-      end_at: Math.floor(Date.now() / 1000) + 10 * 365 * 24 * 60 * 60,
+      total_count: 120,
       quantity: 1,
       customer_notify: true,
       notes: { userId: String(userId), tier },
