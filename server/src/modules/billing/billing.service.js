@@ -418,7 +418,7 @@ export const verifyCheckout = async (userId, { subscriptionId, paymentId, signat
   if (!user) throw new AppError("This subscription does not belong to your account.", 404);
 
   const expected = createHmac("sha256", config.RAZORPAY_KEY_SECRET)
-    .update(`${subscriptionId}|${paymentId}`)
+    .update(`${paymentId}|${subscriptionId}`)
     .digest("hex");
   if (!safeEqualHex(expected, signature)) {
     throw new AppError("Razorpay payment verification failed.", 400);
