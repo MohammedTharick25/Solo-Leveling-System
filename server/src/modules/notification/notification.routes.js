@@ -28,6 +28,15 @@ router.post(
   }),
 );
 
+router.post(
+  "/push/test",
+  [body("endpoint").isURL({ require_tld: false }), validate],
+  asyncHandler(async (req, res) => {
+    const result = await pushService.sendTestNotification(req.userId, req.body.endpoint);
+    sendSuccess(res, result, "Test notification accepted by the push provider.");
+  }),
+);
+
 router.patch(
   "/push/reminder",
   [

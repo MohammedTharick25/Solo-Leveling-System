@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Castle, CheckCircle2, Play, X } from 'lucide-react';
+import { BrainCircuit, Castle, CheckCircle2, Play, Sparkles, X } from 'lucide-react';
 import api from '../../lib/api.js';
+import { useHunterStore } from '../../stores/hunterStore.js';
 import { useAudio } from '../../hooks/useAudio.js';
 import { pageVariants, staggerContainer, staggerItem } from '../../lib/animations.js';
 import { SectionHeader, EmptyState, Button, Badge, Modal } from '../../components/ui/PageLoader.jsx';
@@ -22,6 +23,7 @@ export default function DungeonsPage() {
   const [enterModal, setEnterModal] = useState(false);
   const queryClient = useQueryClient();
   const { playQuestComplete } = useAudio();
+  const { hunter } = useHunterStore();
 
   const { data, isLoading } = useQuery({
     queryKey: ['dungeons'],
@@ -123,6 +125,14 @@ export default function DungeonsPage() {
 
       {/* Enter modal */}
       <Modal open={enterModal} onClose={() => setEnterModal(false)} title="Select Dungeon" maxWidth="max-w-2xl">
+        <div className="mb-4 flex items-start gap-3 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.04] p-3">
+          <BrainCircuit size={17} className="mt-0.5 shrink-0 text-cyan-200" />
+          <div>
+            <p className="text-sm font-semibold text-slate-100">Personalized for your Hunter</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-400">Dungeon steps and rewards adapt to Level {hunter?.level || 1} {hunter?.rank || 'E'} Rank, your active goals, habits, focus history, and growth stats. AI creates the chain when available; a profile-scaled build is used otherwise.</p>
+          </div>
+        </div>
+        {enterMutation.isError && <p role="alert" className="mb-3 rounded-lg border border-red-400/20 bg-red-400/5 px-3 py-2 text-xs text-red-300">{enterMutation.error?.response?.data?.message || "Could not create this dungeon."}</p>}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {DUNGEON_TYPES.map((dt) => (
             <button
@@ -154,7 +164,11 @@ function ActiveDungeonCard({ dungeon, onChallengeComplete, onAbandon, completing
       <div className="p-6 bg-gradient-to-r from-purple-950/40 to-slate-900/40 border-b border-purple-500/20">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Badge color="purple" className="mb-2">{dungeon.difficulty} RANK DUNGEON</Badge>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <Badge color="purple">{dungeon.difficulty} RANK DUNGEON</Badge>
+              <Badge color={dungeon.generationSource === 'ai' ? 'cyan' : 'slate'}>{dungeon.generationSource === 'ai' ? <><Sparkles size={10} /> AI FORGED</> : 'ADAPTIVE BUILD'}</Badge>
+              {dungeon.hunterLevel && <span className="font-display text-[10px] text-slate-500">Built for Lv.{dungeon.hunterLevel} {dungeon.hunterRank} Rank</span>}
+            </div>
             <h3 className="font-heading font-bold text-lg text-slate-100 mb-1">{dungeon.name}</h3>
             <p className="font-body text-sm text-slate-400">{dungeon.description}</p>
           </div>

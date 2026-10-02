@@ -52,6 +52,9 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
+    const isPublicAuthRequest = /\/auth\/(login|register|refresh-token|forgot-password|reset-password)(\/|$)/.test(
+      String(original?.url || ""),
+    );
 
     if (
       error.response?.status === 403 &&
@@ -73,7 +76,7 @@ api.interceptors.response.use(
       }
     }
 
-    if (error.response?.status === 401 && !original._retry) {
+    if (error.response?.status === 401 && !original._retry && !isPublicAuthRequest) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });

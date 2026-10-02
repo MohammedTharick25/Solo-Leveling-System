@@ -31,6 +31,9 @@ const dungeonSchema = new mongoose.Schema(
       required: true,
     },
     type: { type: String, required: true, enum: DUNGEON_TYPES },
+    generationSource: { type: String, enum: ["ai", "adaptive"], default: "adaptive" },
+    hunterLevel: { type: Number, default: 1 },
+    hunterRank: { type: String, default: "E" },
     name: { type: String, required: true },
     description: String,
     difficulty: {

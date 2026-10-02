@@ -1,6 +1,7 @@
 import Notification from "./notification.model.js";
 import User from "../user/user.model.js";
 import { sendEmail } from "../../lib/email/mailer.js";
+import { escapeEmailHtml, renderBrandedEmail } from "../../lib/email/emailLayout.js";
 
 const CATEGORY_BY_TYPE = {
   questAssigned: "questUpdates",
@@ -57,24 +58,25 @@ const canDeliver = (settings, channel, category) => {
 };
 
 const buildEmail = ({ title, message, metadata = {} }) => {
-  const safe = (value) =>
-    String(value ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-
   const details = Object.entries(metadata || {})
     .filter(([key, value]) => value !== undefined && value !== null && typeof value !== "object")
     .slice(0, 8)
-    .map(([key, value]) => `<li><strong>${safe(key)}:</strong> ${safe(value)}</li>`)
+    .map(([key, value]) => `<tr><td style="padding:9px 12px;border-bottom:1px solid #172235;color:#64748b;font-family:Arial,Helvetica,sans-serif;font-size:11px">${escapeEmailHtml(key)}</td><td align="right" style="padding:9px 12px;border-bottom:1px solid #172235;color:#cbd5e1;font-family:Arial,Helvetica,sans-serif;font-size:12px">${escapeEmailHtml(value)}</td></tr>`)
     .join("");
+  const detailsTable = details
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:18px;background-color:#070d18;border:1px solid #1e293b;border-radius:9px;overflow:hidden">${details}</table>`
+    : "";
 
   return {
     subject: `Solo Leveling — ${title}`,
     text: `${title}\n\n${message}${details ? `\n\n${Object.entries(metadata).map(([k, v]) => `${k}: ${v}`).join("\n")}` : ""}`,
-    html: `<!doctype html><html><body style="font-family:Arial,sans-serif;background:#020617;color:#e2e8f0;padding:32px"><div style="max-width:620px;margin:auto;background:#0f172a;border:1px solid #334155;border-radius:16px;padding:28px"><p style="color:#22d3ee;letter-spacing:3px;font-size:12px">SOLO LEVELING SYSTEM</p><h1 style="font-size:24px">${safe(title)}</h1><p style="line-height:1.7;color:#cbd5e1">${safe(message)}</p>${details ? `<ul style="color:#94a3b8;line-height:1.8">${details}</ul>` : ""}</div></body></html>`,
+    html: renderBrandedEmail({
+      preheader: message,
+      eyebrow: "SYSTEM UPDATE",
+      title,
+      content: `<p style="margin:0;color:#cbd5e1;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.75">${escapeEmailHtml(message)}</p>${detailsTable}`,
+      footer: "You received this message because email notifications are enabled for your account.",
+    }),
   };
 };
 

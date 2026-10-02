@@ -72,6 +72,7 @@ const localClock = (date, timeZone) => {
   return {
     time: `${values.hour}:${values.minute}`,
     date: `${dateValues.year}-${dateValues.month}-${dateValues.day}`,
+    minuteOfDay: Number(values.hour) * 60 + Number(values.minute),
   };
 };
 
@@ -94,42 +95,94 @@ export const sendDueStreakReminders = async (now = new Date()) => {
   let skipped = 0;
 
   for (const user of users) {
-    const { date, time } = localClock(now, user.timezone);
-    if (time !== user.settings.notifications.streakReminderTime || user.lastStreakReminderDate === date) {
+    const local = localClock(now, user.timezone);
+    const [reminderHour, reminderMinute] = (user.settings.notifications.streakReminderTime || "19:00").split(":").map(Number);
+    const minutesLate = local.minuteOfDay - (reminderHour * 60 + reminderMinute);
+    if (minutesLate < 0 || minutesLate > 20 || user.lastStreakReminderDate === local.date) {
       skipped += 1;
       continue;
     }
     const hunter = huntersByUserId.get(user._id.toString());
-    if (hunter?.lastActiveDate && localClock(hunter.lastActiveDate, user.timezone).date === date) {
-      user.lastStreakReminderDate = date;
-      await user.save({ validateBeforeSave: false });
+    if (hunter?.currentStreak > 0 && hunter.lastActiveDate && localClock(hunter.lastActiveDate, user.timezone).date === local.date) {
+      await User.updateOne(
+        { _id: user._id, lastStreakReminderDate: { $ne: local.date } },
+        { $set: { lastStreakReminderDate: local.date } },
+      );
       skipped += 1;
       continue;
     }
 
-    user.lastStreakReminderDate = date;
-    await user.save({ validateBeforeSave: false });
+    const claimedUser = await User.findOneAndUpdate(
+      { _id: user._id, lastStreakReminderDate: { $ne: local.date } },
+      { $set: { lastStreakReminderDate: local.date } },
+      { new: true },
+    ).select("pushSubscriptions");
+    if (!claimedUser) {
+      skipped += 1;
+      continue;
+    }
     const payload = JSON.stringify({
       title: "Your daily streak is waiting",
       body: "Choose one small quest and make today count. Coming back is always a win.",
       url: "/quests",
-      tag: `streak-reminder-${date}`,
+      tag: `streak-reminder-${local.date}`,
       type: "streakReminder",
       streak: hunter?.currentStreak || 0,
     });
-    for (const subscription of user.pushSubscriptions) {
+    let delivered = 0;
+    for (const subscription of claimedUser.pushSubscriptions) {
       try {
         await webPush.sendNotification(subscription, payload, { TTL: 60 * 60 });
         sent += 1;
+        delivered += 1;
       } catch (error) {
         if (error.statusCode === 404 || error.statusCode === 410) {
-          user.pushSubscriptions = user.pushSubscriptions.filter((item) => item.endpoint !== subscription.endpoint);
-          await user.save({ validateBeforeSave: false });
+          await User.updateOne({ _id: user._id }, { $pull: { pushSubscriptions: { endpoint: subscription.endpoint } } });
         } else {
           console.error(`[PUSH] Streak reminder failed for ${user._id}:`, error.message);
         }
       }
     }
+    if (!delivered) {
+      await User.updateOne(
+        { _id: user._id, lastStreakReminderDate: local.date },
+        { $unset: { lastStreakReminderDate: 1 } },
+      );
+    }
   }
   return { sent, skipped };
+};
+
+export const sendTestNotification = async (userId, endpoint) => {
+  if (!configured) {
+    throw Object.assign(new Error("Push is not configured on the server. Check its VAPID keys."), { statusCode: 503 });
+  }
+  const user = await User.findById(userId).select("pushSubscriptions");
+  if (!user) throw Object.assign(new Error("User not found."), { statusCode: 404 });
+  const subscription = user.pushSubscriptions.find((item) => item.endpoint === endpoint);
+  if (!subscription) {
+    throw Object.assign(new Error("This device is not subscribed. Connect it again and retry."), { statusCode: 404 });
+  }
+
+  try {
+    await webPush.sendNotification(subscription, JSON.stringify({
+      title: "Push test received",
+      body: "This device can receive notifications from The System.",
+      url: "/settings",
+      tag: `push-test-${Date.now()}`,
+      type: "pushTest",
+    }), { TTL: 60 });
+    return { delivered: true };
+  } catch (error) {
+    if (error.statusCode === 404 || error.statusCode === 410) {
+      await User.updateOne({ _id: userId }, { $pull: { pushSubscriptions: { endpoint } } });
+      throw Object.assign(new Error("This device subscription expired. Disconnect and reconnect the device."), { statusCode: 410 });
+    }
+    if (error.statusCode === 401 || error.statusCode === 403) {
+      console.error(`[PUSH] Test send rejected by push provider (${error.statusCode}).`);
+      throw Object.assign(new Error("The push provider rejected the server's VAPID credentials. Verify the VAPID keys match the subscription."), { statusCode: 502 });
+    }
+    console.error(`[PUSH] Test send failed with status ${error.statusCode || "unknown"}.`);
+    throw Object.assign(new Error(`The push provider could not accept the test notification${error.statusCode ? ` (${error.statusCode})` : ""}.`), { statusCode: 502 });
+  }
 };
