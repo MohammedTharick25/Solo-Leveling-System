@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -56,10 +56,12 @@ const NAV_ITEMS = [
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
-export default function Sidebar({ open, onClose }) {
+export default function Sidebar({ open, onClose, triggerRef }) {
   // 1. Get user from store to access avatar
   const { hunter, user, clearAuth } = useHunterStore();
   const navigate = useNavigate();
+  const sidebarRef = useRef(null);
+  const closeButtonRef = useRef(null);
   const billingQuery = useQuery({
     queryKey: ["billing-me"],
     queryFn: async () => (await api.get("/billing/me")).data.data,
@@ -72,12 +74,39 @@ export default function Sidebar({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
     const handleKeyDown = (event) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = sidebarRef.current?.querySelectorAll(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable?.length) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !sidebarRef.current.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !sidebarRef.current.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      triggerRef?.current?.focus();
+    };
+  }, [open, onClose, triggerRef]);
 
   const handleLogout = async () => {
     try {
@@ -106,6 +135,9 @@ export default function Sidebar({ open, onClose }) {
         {open && (
           <motion.aside
             id="mobile-sidebar"
+            ref={sidebarRef}
+            role="dialog"
+            aria-modal="true"
             aria-label="Mobile navigation"
             initial={{ x: -260 }}
             animate={{ x: 0 }}
@@ -115,9 +147,10 @@ export default function Sidebar({ open, onClose }) {
           >
             <button
               onClick={onClose}
+              ref={closeButtonRef}
               type="button"
               aria-label="Close navigation menu"
-              className="absolute top-4 right-4 p-1.5 text-slate-500 hover:text-slate-300"
+              className="absolute top-3 right-3 flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300"
             >
               <X size={18} />
             </button>
@@ -239,13 +272,13 @@ function SidebarContent({ hunter, user, billing, rankColor, onLogout, onNav, eff
               state={locked ? { from: item.to } : undefined}
               onClick={onNav}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 transition-all duration-200 font-heading font-medium text-sm tracking-wide
+                `flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 transition-all duration-200 font-heading font-medium text-sm tracking-wide focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300
                  ${isActive ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-glow-cyan-sm" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"}`
               }
             >
               <Icon size={16} className="shrink-0" />
               <span className="min-w-0 flex-1">{item.label}</span>
-              {locked && <LockKeyhole size={13} aria-label={`${requiredTier} plan feature`} title={`Included in ${requiredTier === "monarch" ? "Monarch" : "Hunter"}`} className="shrink-0 text-amber-300/80" />}
+              {locked && <LockKeyhole size={13} aria-label={`${requiredTier} plan feature`} title={`Included in ${requiredTier === "monarch" ? "Monarch" : "Hunter"}`} className={`shrink-0 ${requiredTier === "monarch" ? "text-amber-300" : "text-slate-200"}`} />}
             </NavLink>
           );
         })}

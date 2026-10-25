@@ -7,6 +7,7 @@ import {
   awardXP,
   awardStatGains,
   updateStreakOnQuestComplete,
+  deductXP,
 } from "../hunter/hunter.service.js";
 import { checkShadowUnlocks } from "../shadow/shadow.service.js";
 import { checkBossSpawn } from "../boss/boss.service.js";
@@ -17,19 +18,14 @@ import { AppError } from "../../middleware/errorHandler.middleware.js";
 import { checkAndAwardAchievements } from "../achievements/achievement.service.js";
 import { generateJSON, isCloudAIConfigured } from "../../lib/ai/ai.service.js";
 import { buildDailyQuestPrompt } from "../../lib/ai/ai.prompts.js";
+import { getZonedDayBounds, getZonedDateKey, normalizeTimeZone } from "../../lib/timeZones.js";
+import { recordOpsEvent } from "../../lib/opsMetrics.js";
 
 const DAILY_QUEST_COUNT = 5;
 
-// ── Use LOCAL date boundaries (not UTC) so timezone doesn't break "today" ────
-const localStartOfDay = () => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-const localEndOfDay = () => {
-  const d = new Date();
-  d.setHours(23, 59, 59, 999);
-  return d;
+const userDayBounds = async (userId, date = new Date()) => {
+  const user = await User.findById(userId).select("timezone").lean();
+  return getZonedDayBounds(date, normalizeTimeZone(user?.timezone));
 };
 
 const STAT_TO_CATEGORY = {
@@ -93,7 +89,7 @@ const getProfileCategoryPriority = (user) => {
     .map(([category]) => category);
 };
 
-const personalizedFallbackQuests = (user) => {
+const personalizedFallbackQuests = (user, statTargets) => {
   const awakening = user?.awakening || {};
   const goal = awakening.goals?.[0] || "your most important goal";
   const interest = awakening.learningInterests?.[0] || "a skill you want to improve";
@@ -101,40 +97,77 @@ const personalizedFallbackQuests = (user) => {
   const available = Number(awakening.availableDailyMinutes) || 60;
   const exerciseMinutes = Math.max(10, Math.min(25, Math.floor(available * 0.25)));
 
-  return [
-    {
+  const learningGoal = `${goal} ${interest}`;
+  if (/program|coding|javascript|python|software|web dev/i.test(learningGoal)) {
+    const completedLearning = Number(user?.learningQuestCompletions) || 0;
+    const phase = Math.min(3, Math.floor(completedLearning / 5));
+    const tracks = [
+      [
+        ["Set up your coding workspace", "Open a browser-based editor or your existing editor. Create a file, run a tiny program, and save the result."],
+        ["Learn one programming building block", "Study variables and basic values for 15 minutes, then write three examples in your own code."],
+        ["Practice input and output", "Write a tiny program that accepts or uses one value and prints a useful result. Run it twice with different values."],
+        ["Trace a short program", "Read a small example line by line. Write down the value of each variable after every step, then run it to check."],
+        ["Build a first mini program", "Make a small command-line or browser program that solves one simple problem. Save it and note one improvement."],
+      ],
+      [
+        ["Practice decisions", "Use if/else in a small program that handles at least three different inputs. Run all three cases."],
+        ["Practice repetition", "Use a loop to process a short list or repeat an action. Check the output and explain when the loop stops."],
+        ["Break a problem into steps", "Write pseudocode for a small feature, then implement and run the first half."],
+        ["Debug with evidence", "Run a program with a deliberate mistake, inspect the error, fix it, and record what the message revealed."],
+        ["Create a guided mini project", "Combine decisions and repetition in a small useful program. Run three checks and save the working version."],
+      ],
+      [
+        ["Organize code into functions", "Move one repeated action into a function, call it with two inputs, and verify both results."],
+        ["Work with a collection of data", "Store several values in a list or array and write code to find or transform one result."],
+        ["Read and adapt an example", `Choose a short example related to ${goal}, explain its main parts, then change one behavior and run it.`],
+        ["Plan a personal project", `Define one small problem ${goal} could solve, list its inputs and outputs, and split it into three features.`],
+        ["Ship your first project slice", "Implement one complete feature from your plan, run at least three checks, and save or share the result."],
+      ],
+      [
+        ["Review a project for quality", "Revisit your project, remove one duplication or confusing section, and confirm its behavior still works."],
+        ["Add input validation", "Handle one invalid or unexpected input in your project and test both valid and invalid cases."],
+        ["Learn a tool your project needs", "Identify one missing skill for your project, study it briefly, and build a tiny working example."],
+        ["Complete a second project feature", "Build the next highest-value feature in your project and check it against your written plan."],
+        ["Demo and choose the next level", "Run through your project as a user, write what works and what is missing, then choose the next concrete milestone."],
+      ],
+    ];
+    const tasks = tracks[phase];
+    const stepIndex = completedLearning % tasks.length;
+    const [title, description] = tasks[stepIndex];
+    const mainTarget = statTargets[0];
+    const goalQuest = {
+      title,
+      description,
+      purpose: `Training path ${phase + 1}: ${goal}`.slice(0, 300),
+      category: mainTarget.category,
+      difficulty: phase < 2 ? "E" : phase === 2 ? "D" : "C",
+      xpReward: [55, 60, 65, 65, 75][stepIndex],
+      targetValue: 1,
+      unit: "deliverable",
+      statRewards: [{ stat: mainTarget.stat, amount: 3 }],
+      targetStat: mainTarget.stat,
+      targetStatValue: mainTarget.currentValue,
+      targetReason: mainTarget.role,
+    };
+    return [goalQuest, ...statTargets.slice(1).map((target) =>
+      createWeakStatQuest(target, { goal, interest, fitness, exerciseMinutes }),
+    )];
+  }
+
+  const mainTarget = statTargets[0];
+  const goalQuest = {
       title: `Goal Sprint: ${goal}`.slice(0, 120),
       description: `Spend ${Math.min(25, Math.max(15, Math.floor(available * 0.3)))} focused minutes on the smallest useful step toward ${goal}.`,
-      category: "productivity", difficulty: "D", xpReward: 65, targetValue: 1, unit: "session",
-      statRewards: [{ stat: "discipline", amount: 3 }],
-    },
-    {
-      title: `Learn: ${interest}`.slice(0, 120),
-      description: `Practice or study ${interest} for 15 focused minutes and write down one thing you learned.`,
-      category: "learning", difficulty: "E", xpReward: 55, targetValue: 15, unit: "minutes",
-      statRewards: [{ stat: "intelligence", amount: 3 }],
-    },
-    {
-      title: fitness === "sedentary" ? "Movement Reset" : "Training Sprint",
-      description: fitness === "sedentary"
-        ? `Take a ${exerciseMinutes}-minute walk or do gentle movement.`
-        : `Complete ${exerciseMinutes} minutes of exercise at a comfortable intensity.`,
-      category: "health", difficulty: "E", xpReward: 55, targetValue: exerciseMinutes, unit: "minutes",
-      statRewards: [{ stat: "vitality", amount: 3 }],
-    },
-    {
-      title: "Distraction Breaker",
-      description: "Choose one task, remove one distraction, and work on it until the timer ends.",
-      category: "focus", difficulty: "D", xpReward: 60, targetValue: 1, unit: "session",
-      statRewards: [{ stat: "sense", amount: 3 }],
-    },
-    {
-      title: "Daily Reflection",
-      description: "Write one win, one lesson, and the first task you want to tackle tomorrow.",
-      category: "emotionalControl", difficulty: "E", xpReward: 40, targetValue: 1, unit: "entry",
-      statRewards: [{ stat: "emotionalControl", amount: 2 }],
-    },
-  ];
+      purpose: `Build progress toward ${goal}`,
+      category: mainTarget.category, difficulty: "D", xpReward: 65, targetValue: 1, unit: "session",
+      statRewards: [{ stat: mainTarget.stat, amount: 3 }],
+      targetStat: mainTarget.stat,
+      targetStatValue: mainTarget.currentValue,
+      targetReason: mainTarget.role,
+  };
+  return [goalQuest, ...statTargets.slice(1).map((target) =>
+    createWeakStatQuest(target, { goal, interest, fitness, exerciseMinutes }),
+  )];
 };
 
 
@@ -150,6 +183,81 @@ const CATEGORY_DEFAULT_STAT = {
   timeManagement: "timeManagement",
 };
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const GOAL_CATEGORY_STAT = { career: "problemSolving" };
+
+const getDailyStatTargets = (user, stats) => {
+  const profileCategories = getProfileCategoryPriority(user);
+  const awakening = user?.awakening || {};
+  const primaryGoalText = normalizeProfileText([
+    awakening.goals?.[0],
+    awakening.learningInterests?.[0],
+    awakening.longTermVision,
+  ]);
+  const explicitGoalCategory = Object.entries(CATEGORY_KEYWORDS)
+    .map(([category, keywords]) => ({
+      category,
+      score: keywords.reduce((total, keyword) => total + (primaryGoalText.includes(keyword) ? 1 : 0), 0),
+    }))
+    .sort((a, b) => b.score - a.score)[0];
+  const prioritizedCategories = explicitGoalCategory?.score > 0
+    ? [explicitGoalCategory.category, ...profileCategories]
+    : profileCategories;
+  const primaryStat = prioritizedCategories
+    .map((category) => CATEGORY_DEFAULT_STAT[category] || GOAL_CATEGORY_STAT[category])
+    .find((stat) => LIFE_STATS.includes(stat)) || "intelligence";
+  const values = Object.fromEntries(LIFE_STATS.map((stat) => [
+    stat,
+    Number.isFinite(Number(stats?.[stat]?.value)) ? Number(stats[stat].value) : 10,
+  ]));
+  const dayNumber = Math.floor(Date.now() / 86400000);
+  const tieStart = dayNumber % LIFE_STATS.length;
+  const tieOrder = (stat) => (LIFE_STATS.indexOf(stat) - tieStart + LIFE_STATS.length) % LIFE_STATS.length;
+  const weakest = [...LIFE_STATS].sort((a, b) => values[a] - values[b] || tieOrder(a) - tieOrder(b));
+  const orderedStats = [primaryStat, ...weakest.filter((stat) => stat !== primaryStat)].slice(0, DAILY_QUEST_COUNT);
+
+  return orderedStats.map((stat, index) => ({
+    stat,
+    currentValue: values[stat],
+    category: STAT_TO_CATEGORY[stat] || CATEGORY_DEFAULT_STAT[stat] || "productivity",
+    role: index === 0 ? "main goal" : "lowest stat",
+  }));
+};
+
+const createWeakStatQuest = (target, { goal, interest, fitness, exerciseMinutes }) => {
+  const byStat = {
+    strength: ["Strength Builder", "Do a short bodyweight strength set at a level that feels comfortable. Log what you completed."],
+    agility: ["Quick Execution Sprint", "Choose one small task toward your goal, work on it without switching, and record the result."],
+    intelligence: [`Skill Practice: ${interest}`, `Study or practice ${interest} for 15 minutes, then write one example or idea in your own words.`],
+    vitality: [fitness === "sedentary" ? "Movement Reset" : "Vitality Session", fitness === "sedentary" ? `Take a gentle ${exerciseMinutes}-minute walk or movement break.` : `Do ${exerciseMinutes} minutes of comfortable movement and note how you feel.`],
+    sense: ["Focused Work Block", `Work on one clearly defined next step for ${goal} for 20 minutes with distractions silenced.`],
+    discipline: ["Keep One Small Promise", `Choose one 10-minute action that supports ${goal}, complete it at the time you chose, and mark it done.`],
+    communication: ["Explain It Clearly", `Write or say a short explanation of one idea related to ${goal}, then make it clearer in one revision.`],
+    leadership: ["Take Initiative", `Identify one small useful next step for ${goal}, write who or what it helps, and complete the part within your control.`],
+    creativity: ["Create a Small Draft", `Make one rough sketch, outline, prototype, or written draft related to ${goal}. Keep it small and save it.`],
+    financialIntelligence: ["Money Awareness Check", "Record today's spending or review one recent expense, then identify one practical choice for next time."],
+    problemSolving: ["Solve One Blocker", `Name one obstacle slowing ${goal}, list two possible fixes, and try the simplest safe one.`],
+    emotionalControl: ["Reset and Reflect", "Take a quiet five-minute pause, then write what is on your mind and one next action you can control."],
+    timeManagement: ["Plan the Next Block", `Choose the next task for ${goal}, estimate its time, and reserve a realistic slot for it today.`],
+  };
+  const [title, description] = byStat[target.stat] || byStat.problemSolving;
+  const targetValue = target.stat === "vitality" ? exerciseMinutes : 1;
+  const unit = target.stat === "vitality" ? "minutes" : "task";
+  return {
+    title,
+    description,
+    purpose: `Strengthen ${target.stat} (current value ${target.currentValue}) while supporting ${goal}.`,
+    category: target.category,
+    difficulty: target.currentValue < 20 ? "E" : "D",
+    xpReward: 50,
+    targetValue,
+    unit,
+    statRewards: [{ stat: target.stat, amount: 3 }],
+      targetStat: target.stat,
+      targetStatValue: target.currentValue,
+      targetReason: target.role,
+  };
+};
 
 const cleanAIQuest = (raw) => {
   if (!raw || typeof raw !== "object") return null;
@@ -174,7 +282,8 @@ const cleanAIQuest = (raw) => {
   };
 };
 
-const createAIQuestsForUser = async ({ userId, user, hunter, stats, slotsNeeded }) => {
+const createAIQuestsForUser = async ({ userId, user, hunter, stats, statTargets, startingSlot, slotsNeeded }) => {
+  const { end: localEnd } = getZonedDayBounds(new Date(), normalizeTimeZone(user?.timezone));
   if (!isCloudAIConfigured()) return [];
   const profile = {
     age: user.awakening?.age,
@@ -190,6 +299,8 @@ const createAIQuestsForUser = async ({ userId, user, hunter, stats, slotsNeeded 
     biggestStrengths: user.awakening?.biggestStrengths || [],
     availableDailyMinutes: user.awakening?.availableDailyMinutes,
     longTermVision: user.awakening?.longTermVision,
+    completedRelevantQuests: user.learningQuestHistory || [],
+    dailyStatTargets: statTargets,
   };
 
   const result = await generateJSON({
@@ -205,7 +316,8 @@ const createAIQuestsForUser = async ({ userId, user, hunter, stats, slotsNeeded 
         acc[name] = stats[name]?.value ?? 0;
         return acc;
       }, {}) : {},
-      currentDate: new Date().toISOString().slice(0, 10),
+      currentDate: getZonedDateKey(new Date(), normalizeTimeZone(user?.timezone)),
+      statTargets,
     }),
   });
 
@@ -224,8 +336,18 @@ const createAIQuestsForUser = async ({ userId, user, hunter, stats, slotsNeeded 
     throw new Error(`AI returned ${valid.length} valid daily quests; exactly 5 are required.`);
   }
 
+  valid.forEach((quest, index) => {
+    const target = statTargets[index];
+    quest.category = target.category;
+    quest.stat = target.stat;
+    quest.targetStat = target.stat;
+    quest.targetStatValue = target.currentValue;
+    quest.targetReason = target.role;
+    quest.purpose = `${quest.purpose} Builds ${target.stat} (current value ${target.currentValue}).`;
+  });
+
   const created = [];
-  for (const q of valid.slice(0, slotsNeeded)) {
+  for (const q of valid.slice(startingSlot, startingSlot + slotsNeeded)) {
     created.push(await Quest.create({
       userId,
       title: q.title,
@@ -235,12 +357,15 @@ const createAIQuestsForUser = async ({ userId, user, hunter, stats, slotsNeeded 
       difficulty: q.difficulty,
       xpReward: q.xpReward,
       statRewards: [{ stat: q.stat, amount: q.statAmount }],
+      targetStat: q.targetStat,
+      targetStatValue: q.targetStatValue,
+      targetReason: q.targetReason,
       expectedOutcome: q.expectedOutcome,
       generatedReason: "Personalized from your Awakening profile",
       targetValue: q.targetValue,
       unit: q.unit,
       evolutionLevel: 1,
-      dueAt: localEndOfDay(),
+      dueAt: localEnd,
       isSystemGenerated: true,
     }));
   }
@@ -263,68 +388,13 @@ const LIFE_STATS = [
   "timeManagement",
 ];
 
-// Fallback quest templates if DB has none seeded yet
-const FALLBACK_QUESTS = [
-  {
-    title: "Morning Activation",
-    description: "Complete a 10-minute morning routine.",
-    category: "discipline",
-    difficulty: "E",
-    xpReward: 50,
-    targetValue: 1,
-    unit: "session",
-    statRewards: [{ stat: "discipline", amount: 2 }],
-  },
-  {
-    title: "Focus Session",
-    description: "Complete one 25-minute Pomodoro session.",
-    category: "focus",
-    difficulty: "D",
-    xpReward: 60,
-    targetValue: 1,
-    unit: "session",
-    statRewards: [{ stat: "sense", amount: 3 }],
-  },
-  {
-    title: "Physical Activity",
-    description: "Do at least 20 minutes of exercise or walking.",
-    category: "health",
-    difficulty: "D",
-    xpReward: 70,
-    targetValue: 20,
-    unit: "minutes",
-    statRewards: [{ stat: "strength", amount: 3 }],
-  },
-  {
-    title: "Read or Learn Something",
-    description: "Read for 15 minutes or complete one lesson.",
-    category: "learning",
-    difficulty: "E",
-    xpReward: 55,
-    targetValue: 15,
-    unit: "minutes",
-    statRewards: [{ stat: "intelligence", amount: 3 }],
-  },
-  {
-    title: "Evening Reflection",
-    description: "Write a short journal entry for today.",
-    category: "emotionalControl",
-    difficulty: "E",
-    xpReward: 40,
-    targetValue: 1,
-    unit: "entry",
-    statRewards: [{ stat: "emotionalControl", amount: 2 }],
-  },
-];
-
 /**
  * Generate exactly DAILY_QUEST_COUNT quests for today.
  * Uses local time (not UTC) to avoid timezone boundary issues.
  * Uses cloud AI as the primary generator and a profile-aware local backup if AI is unavailable.
  */
-export const generateQuestsForUser = async (userId, io = null) => {
-  const todayStart = localStartOfDay();
-  const todayEnd = localEndOfDay();
+const generateQuestsForUserUnlocked = async (userId, io = null) => {
+  const { start: todayStart, end: todayEnd } = await userDayBounds(userId);
 
   // Count quests created today (local time)
   const todaysQuestCount = await Quest.countDocuments({
@@ -344,13 +414,26 @@ export const generateQuestsForUser = async (userId, io = null) => {
   const [stats, hunter, user] = await Promise.all([
     Stats.findOne({ userId }),
     Hunter.findOne({ userId }),
-    User.findById(userId).select("awakening"),
+    User.findById(userId).select("awakening timezone"),
   ]);
 
   if (!hunter) {
     console.warn(`[QUEST] Hunter not found for user ${userId}`);
     return [];
   }
+
+  if (user?.awakening) {
+    const relevantLearningFilter = {
+      userId,
+      status: "completed",
+      $or: [{ category: "learning" }, { purpose: /^Training path/ }],
+    };
+    const relevant = await Quest.find(relevantLearningFilter)
+      .sort({ completedAt: -1 }).limit(8).select("title expectedOutcome").lean();
+    user.learningQuestCompletions = await Quest.countDocuments(relevantLearningFilter);
+    user.learningQuestHistory = relevant.map(({ title, expectedOutcome }) => ({ title, outcome: expectedOutcome }));
+  }
+  const statTargets = getDailyStatTargets(user, stats);
 
   let newQuests = [];
   let aiGenerationFailed = false;
@@ -364,19 +447,24 @@ export const generateQuestsForUser = async (userId, io = null) => {
         user,
         hunter,
         stats,
+        statTargets,
+        startingSlot: todaysQuestCount,
         slotsNeeded,
       });
       console.log(`[QUEST] Generated ${newQuests.length} AI-personalized quests for user ${userId}`);
     } catch (error) {
       aiGenerationFailed = true;
+      recordOpsEvent("ai", "daily_quest_generation_fallback", "fallback", error);
       console.error(`[QUEST] AI daily quest generation failed for user ${userId}:`, error.message);
     }
+  } else {
+    recordOpsEvent("ai", "daily_quest_ai_not_configured_fallback", "fallback");
   }
 
   // Safe local backup. This is only reached when AI is not configured or the
   // provider returns an invalid response/error.
   if (newQuests.length === 0) {
-    const personalized = personalizedFallbackQuests(user);
+    const personalized = personalizedFallbackQuests(user, statTargets);
     const toCreate = personalized.slice(
       todaysQuestCount,
       todaysQuestCount + slotsNeeded,
@@ -387,18 +475,21 @@ export const generateQuestsForUser = async (userId, io = null) => {
         userId,
         title: q.title,
         description: q.description,
-        purpose: `Build your ${q.category} skill`,
+        purpose: q.purpose || `Build your ${q.category} skill`,
         category: q.category,
         difficulty: q.difficulty,
         xpReward: q.xpReward,
         statRewards: q.statRewards,
+        targetStat: q.targetStat,
+        targetStatValue: q.targetStatValue,
+        targetReason: q.targetReason,
         targetValue: q.targetValue,
         unit: q.unit,
         generatedReason: aiGenerationFailed
           ? "Personalized local backup because AI was temporarily unavailable"
           : "Personalized daily assignment",
         evolutionLevel: 1,
-        dueAt: localEndOfDay(),
+        dueAt: todayEnd,
         isSystemGenerated: true,
       });
       newQuests.push(quest);
@@ -426,13 +517,57 @@ export const generateQuestsForUser = async (userId, io = null) => {
   return newQuests;
 };
 
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+// Mongo's atomic per-user lease coordinates API requests and cron workers across
+// processes. The lease expires so a crashed worker cannot block future plans.
+export const generateQuestsForUser = async (userId, io = null) => {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const now = new Date();
+    const lockUntil = new Date(now.getTime() + 10 * 60 * 1000);
+    const lock = await User.findOneAndUpdate(
+      {
+        _id: userId,
+        $or: [
+          { dailyQuestGenerationLockUntil: null },
+          { dailyQuestGenerationLockUntil: { $lte: now } },
+        ],
+      },
+      { $set: { dailyQuestGenerationLockUntil: lockUntil } },
+      { new: true },
+    ).select("_id").lean();
+
+    if (lock) {
+      try {
+        return await generateQuestsForUserUnlocked(userId, io);
+      } finally {
+        try {
+          await User.updateOne(
+            { _id: userId, dailyQuestGenerationLockUntil: lockUntil },
+            { $set: { dailyQuestGenerationLockUntil: null } },
+          );
+        } catch (error) {
+          console.error(`[QUEST] Could not release generation lease for ${userId}: ${error.message}`);
+        }
+      }
+    }
+
+    const user = await User.findById(userId).select("dailyQuestGenerationLockUntil").lean();
+    if (!user) return [];
+    if (!user.dailyQuestGenerationLockUntil || user.dailyQuestGenerationLockUntil <= now) continue;
+    await wait(250);
+  }
+
+  console.warn(`[QUEST] Daily generation is already running for user ${userId}; leaving the existing run in control.`);
+  return [];
+};
+
 /**
  * Get today's quests (local time).
  * Auto-generates if none exist yet for today.
  */
 export const getTodaysQuests = async (userId, io = null) => {
-  const todayStart = localStartOfDay();
-  const todayEnd = localEndOfDay();
+  const { start: todayStart, end: todayEnd } = await userDayBounds(userId);
 
   let quests = await Quest.find({
     userId,
@@ -464,12 +599,12 @@ export const getActiveQuests = async (userId) => {
 };
 
 export const getQuestHistory = async (userId, page = 1, limit = 20) => {
-  const todayStart = localStartOfDay();
+  const { start: todayStart } = await userDayBounds(userId);
   const skip = (page - 1) * limit;
   const [quests, total] = await Promise.all([
     Quest.find({
       userId,
-      status: { $in: ["completed", "failed", "expired"] },
+      status: { $in: ["completed", "failed", "expired", "recovered"] },
       createdAt: { $lt: todayStart },
     })
       .sort({ updatedAt: -1 })
@@ -477,7 +612,7 @@ export const getQuestHistory = async (userId, page = 1, limit = 20) => {
       .limit(limit),
     Quest.countDocuments({
       userId,
-      status: { $in: ["completed", "failed", "expired"] },
+      status: { $in: ["completed", "failed", "expired", "recovered"] },
       createdAt: { $lt: todayStart },
     }),
   ]);
@@ -609,8 +744,8 @@ export const completeQuest = async (questId, userId, io = null) => {
     userId,
     "questCompleted",
     "QUEST COMPLETE",
-    `"${quest.title}" completed. +${quest.xpReward} XP awarded.`,
-    { questId: quest._id, xpEarned: quest.xpReward },
+    `"${quest.title}" completed. +${xpResult.xpEarned} XP awarded.`,
+    { questId: quest._id, xpEarned: xpResult.xpEarned },
     io,
   );
 
@@ -634,12 +769,165 @@ export const completeQuest = async (questId, userId, io = null) => {
   return { quest, allDone, total, completed, goalProgress };
 };
 
-export const failQuest = async (questId, userId) => {
+export const failQuest = async (questId, userId, io = null) => {
+  const existing = await Quest.findOne({ _id: questId, userId, status: "active" }).select("xpReward").lean();
+  if (!existing) throw new AppError("Quest not found.", 404);
+  const penalty = calculateMissedQuestPenalty(existing.xpReward);
   const quest = await Quest.findOneAndUpdate(
     { _id: questId, userId, status: "active" },
-    { status: "failed", failedAt: new Date() },
+    { $set: { status: "failed", failedAt: new Date(), xpPenalty: penalty } },
     { new: true },
   );
   if (!quest) throw new AppError("Quest not found.", 404);
+  const deducted = await deductXP(userId, penalty, io);
+  quest.xpPenalty = deducted || 0;
+  await quest.save();
+  await createNotification(
+    userId,
+    "questFailed",
+    "QUEST FAILED",
+    `"${quest.title}" was marked as failed. ${deducted || 0} XP was deducted.`,
+    { questId: quest._id, xpPenalty: deducted || 0 },
+    io,
+  );
   return quest;
+};
+
+export const recoverExpiredQuest = async (missedQuestId, userId, replaceQuestId, io = null) => {
+  if (!replaceQuestId || String(missedQuestId) === String(replaceQuestId)) {
+    throw new AppError("Choose a different active quest to replace.", 400);
+  }
+
+  const { start: todayStart, end: todayEnd } = await userDayBounds(userId);
+  const missedQuest = await Quest.findOne({ _id: missedQuestId, userId, status: "expired" });
+  if (!missedQuest) throw new AppError("This missed quest is no longer available to recover.", 404);
+
+  const replacement = await Quest.findOne({
+    _id: replaceQuestId,
+    userId,
+    status: "active",
+    createdAt: { $gte: todayStart, $lte: todayEnd },
+    $or: [
+      { recoveryHistory: { $size: 0 } },
+      { recoveryHistory: { $exists: false } },
+    ],
+  });
+  if (!replacement) {
+    throw new AppError("Choose an unused active quest from today's plan to replace.", 409);
+  }
+
+  const recoveredAt = new Date();
+  const claimedMissedQuest = await Quest.findOneAndUpdate(
+    { _id: missedQuest._id, userId, status: "expired" },
+    { $set: { status: "recovered", recoveredAt } },
+    { new: true },
+  );
+  if (!claimedMissedQuest) throw new AppError("This missed quest has already been recovered.", 409);
+
+  const replacementFields = {
+    title: missedQuest.title,
+    description: missedQuest.description,
+    purpose: missedQuest.purpose,
+    category: missedQuest.category,
+    difficulty: missedQuest.difficulty,
+    xpReward: missedQuest.xpReward,
+    earnedXP: 0,
+    xpPenalty: 0,
+    statRewards: missedQuest.statRewards,
+    targetStat: missedQuest.targetStat,
+    targetStatValue: missedQuest.targetStatValue,
+    targetReason: missedQuest.targetReason,
+    expectedOutcome: missedQuest.expectedOutcome,
+    generatedReason: `Recovered missed quest; ${replacement.title} was moved aside`,
+    goalId: missedQuest.goalId,
+    goalQuestId: missedQuest.goalQuestId,
+    targetValue: missedQuest.targetValue,
+    currentValue: missedQuest.currentValue,
+    unit: missedQuest.unit,
+    dueAt: todayEnd,
+    completedAt: null,
+    failedAt: null,
+    status: "active",
+    isSystemGenerated: true,
+  };
+
+  const recoveredQuest = await Quest.findOneAndUpdate(
+    {
+      _id: replacement._id,
+      userId,
+      status: "active",
+      createdAt: { $gte: todayStart, $lte: todayEnd },
+      $or: [
+        { recoveryHistory: { $size: 0 } },
+        { recoveryHistory: { $exists: false } },
+      ],
+    },
+    {
+      $set: replacementFields,
+      $push: {
+        recoveryHistory: {
+          replacedTitle: replacement.title,
+          replacedDescription: replacement.description,
+          replacedCategory: replacement.category,
+          replacedTargetValue: replacement.targetValue,
+          replacedCurrentValue: replacement.currentValue,
+          replacedUnit: replacement.unit,
+          replacedAt: recoveredAt,
+        },
+      },
+    },
+    { new: true, runValidators: true },
+  );
+
+  if (!recoveredQuest) {
+    await Quest.updateOne(
+      { _id: claimedMissedQuest._id, userId, status: "recovered", recoveredAt },
+      { $set: { status: "expired", recoveredAt: null } },
+    );
+    throw new AppError("Today's active plan changed. Refresh and choose another quest.", 409);
+  }
+
+  await createNotification(
+    userId,
+    "questAssigned",
+    "QUEST RECOVERED",
+    `"${missedQuest.title}" was added to today's plan in place of "${replacement.title}". Its earlier XP deduction remains.`,
+    { questId: recoveredQuest._id, recoveredQuestId: missedQuest._id, replacedQuestTitle: replacement.title },
+    io,
+  );
+
+  return { quest: recoveredQuest, replacedQuestTitle: replacement.title, xpPenalty: missedQuest.xpPenalty || 0 };
+};
+
+const calculateMissedQuestPenalty = (xpReward) =>
+  clamp(Math.round(Number(xpReward || 0) * (0.1 + Math.random() * 0.15)), 5, 25);
+
+// Expire each missed quest once and apply a small, task-scaled XP consequence.
+// The penalty is 10–25% of that quest's reward, with a 5–25 XP cap.
+export const expireMissedQuests = async (userId, io = null, now = new Date()) => {
+  const { start: todayStart } = await userDayBounds(userId, now);
+  const missed = await Quest.find({ userId, status: "active", dueAt: { $lt: todayStart } });
+  let expiredCount = 0;
+  for (const quest of missed) {
+    const penalty = calculateMissedQuestPenalty(quest.xpReward);
+    const expired = await Quest.findOneAndUpdate(
+      { _id: quest._id, status: "active" },
+      { $set: { status: "expired", failedAt: new Date(), xpPenalty: penalty } },
+      { new: true },
+    );
+    if (!expired) continue;
+    const deducted = await deductXP(quest.userId, penalty, io);
+    expired.xpPenalty = deducted || 0;
+    await expired.save();
+    expiredCount += 1;
+    await createNotification(
+      quest.userId,
+      "systemWarning",
+      "QUEST MISSED",
+      `"${quest.title}" expired. ${deducted || 0} XP was deducted. Start today's plan with a manageable step.`,
+      { questId: quest._id, xpPenalty: deducted || 0 },
+      io,
+    );
+  }
+  return { expiredCount };
 };

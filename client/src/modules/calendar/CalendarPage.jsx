@@ -44,6 +44,12 @@ export default function CalendarPage() {
   const [wkStart, setWkStart] = useState(sow(new Date()));
   const today = new Date();
   const wkEnd = addD(wkStart, 6);
+  const { data: billing } = useQuery({
+    queryKey: ["billing-me"],
+    queryFn: async () => (await api.get("/billing/me")).data.data,
+    staleTime: 30_000,
+    retry: 1,
+  });
 
   // 1. Fetch Raids
   const { data: raidsData } = useQuery({
@@ -52,6 +58,9 @@ export default function CalendarPage() {
       const response = await api.get("/raids?limit=100");
       return response.data?.data?.raids || [];
     },
+    // Raids are Monarch-only. Keep the Free calendar usable without triggering
+    // the global plan-required redirect for this optional calendar layer.
+    enabled: billing?.effectiveTier === "monarch",
   });
 
   // 2. Fetch Today's Quests

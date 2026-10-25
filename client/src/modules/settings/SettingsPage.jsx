@@ -71,7 +71,7 @@ export default function SettingsPage() {
     hunterName: user?.hunterName || "",
     bio: user?.bio || "",
     country: user?.country || "",
-    timezone: user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    timezone: user?.timezoneSet ? user.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone || user?.timezone || "UTC",
   });
   const [passwords, setPasswords] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [dangerPassword, setDangerPassword] = useState("");
@@ -128,7 +128,7 @@ export default function SettingsPage() {
         hunterName: user.hunterName || "",
         bio: user.bio || "",
         country: user.country || "",
-        timezone: user.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        timezone: user.timezoneSet ? user.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone || user.timezone || "UTC",
       });
     }
   }, [user?._id]);

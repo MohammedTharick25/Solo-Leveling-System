@@ -108,6 +108,22 @@ export const STAT_LABELS = {
   timeManagement: "Time Management",
 };
 
+export const STAT_GUIDANCE = {
+  strength: "Build it with progressive resistance training and physical challenges.",
+  agility: "Build it with movement, coordination, and quick decision practice.",
+  intelligence: "Build it by learning new ideas and applying them to real work.",
+  vitality: "Build it with regular exercise, recovery, sleep, and healthy routines.",
+  sense: "Build it with focused work, observation, and attention training.",
+  discipline: "Build it by finishing planned tasks and keeping small promises to yourself.",
+  communication: "Build it by practicing clear writing, speaking, and active listening.",
+  leadership: "Build it by taking responsibility, planning, and helping a team move forward.",
+  creativity: "Build it by making things, exploring alternatives, and trying new approaches.",
+  financialIntelligence: "Build it by budgeting, tracking spending, and learning money skills.",
+  problemSolving: "Build it by breaking problems down, testing solutions, and reviewing results.",
+  emotionalControl: "Build it by noticing emotions, pausing, and choosing a deliberate response.",
+  timeManagement: "Build it by planning realistic blocks and reviewing how you used your time.",
+};
+
 export const STAT_COLORS = {
   strength: "#22d3ee",
   agility: "#34d399",

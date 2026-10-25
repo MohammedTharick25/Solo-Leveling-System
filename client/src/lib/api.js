@@ -13,6 +13,8 @@ console.log("Axios baseURL:", api.defaults.baseURL);
 api.interceptors.request.use(
   (config) => {
     const token = useHunterStore.getState().token;
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (timezone) config.headers["X-Time-Zone"] = timezone;
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

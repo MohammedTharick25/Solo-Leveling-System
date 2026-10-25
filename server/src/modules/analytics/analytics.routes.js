@@ -7,12 +7,12 @@ import Hunter from "../hunter/hunter.model.js";
 import TaskRaid from "../taskRaid/taskRaid.model.js";
 import KnowledgeNote from "../brain/knowledgeNote.model.js";
 import Stats from "../stats/stats.model.js";
+import User from "../user/user.model.js";
 import {
   sendSuccess,
   asyncHandler,
-  startOfDay,
-  endOfDay,
 } from "../../lib/helpers.js";
+import { getZonedDayBounds, getZonedDateKey, getZonedYearBounds, normalizeTimeZone } from "../../lib/timeZones.js";
 import { Router } from "express";
 import { protect, requireAwakened } from "../../middleware/auth.middleware.js";
 import { projectFutureSelf } from "../../lib/xpFormulas.js";
@@ -25,8 +25,7 @@ import { requirePlan } from "../../middleware/requirePlan.middleware.js";
  */
 const snapshotJobs = new Map();
 
-const buildDailySnapshot = async (userId, today) => {
-  const todayEnd = endOfDay(today);
+const buildDailySnapshot = async (userId, today, todayEnd) => {
   const range = { $gte: today, $lte: todayEnd };
 
   const [
@@ -139,11 +138,12 @@ const buildDailySnapshot = async (userId, today) => {
 };
 
 export const recordDailySnapshot = async (userId) => {
-  const today = startOfDay();
+  const user = await User.findById(userId).select("timezone").lean();
+  const { start: today, end: todayEnd } = getZonedDayBounds(new Date(), normalizeTimeZone(user?.timezone));
   const key = `${userId}:${today.toISOString()}`;
   if (snapshotJobs.has(key)) return snapshotJobs.get(key);
 
-  const job = buildDailySnapshot(userId, today);
+  const job = buildDailySnapshot(userId, today, todayEnd);
   snapshotJobs.set(key, job);
   try {
     return await job;
@@ -165,9 +165,10 @@ export const getDashboard = async (userId) => {
 };
 
 export const getHeatmap = async (userId, year) => {
-  if (Number(year) === new Date().getFullYear()) await recordDailySnapshot(userId);
-  const start = new Date(`${year}-01-01T00:00:00Z`);
-  const end = new Date(`${year}-12-31T23:59:59Z`);
+  const user = await User.findById(userId).select("timezone").lean();
+  const timezone = normalizeTimeZone(user?.timezone);
+  if (Number(year) === Number(getZonedDateKey(new Date(), timezone).slice(0, 4))) await recordDailySnapshot(userId);
+  const { start, end } = getZonedYearBounds(year, timezone);
 
   const snapshots = await Analytics.find({
     userId,
@@ -177,7 +178,7 @@ export const getHeatmap = async (userId, year) => {
   );
 
   return snapshots.map((s) => ({
-    date: s.date.toISOString().split("T")[0],
+    date: getZonedDateKey(s.date, timezone),
     score: s.productivityScore,
     quests: s.questsCompleted,
     habits: s.habitsCompleted || 0,

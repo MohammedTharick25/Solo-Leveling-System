@@ -19,6 +19,27 @@ The hosted application is intended to be used as a SaaS product. Access to the h
 
 Feature availability may depend on account plan, configuration, and deployment.
 
+## Recent improvements
+
+- **Personalized daily quests:** Quest plans use the Hunter's Awakening profile, goals, interests, and current stats. Assignments can target a primary goal or a weaker stat, with varied categories and progressive training paths.
+- **Clear progression:** Quest cards explain which stat they build and why they were selected. Hunter attributes describe practical ways to improve each stat and show recent gains.
+- **Quest consequences and recovery:** Missed or failed quests apply a task-scaled XP deduction. Expired quests can be recovered by swapping one into today's plan, while keeping the original deduction visible.
+- **Quest-linked focus:** Focus sessions choose a practical duration based on the linked quest.
+- **Local-day consistency:** Quests, deadlines, penalties, streaks, analytics, habits, and journal entries follow the account timezone, including daylight-saving transitions.
+- **Plan access:** Free, Hunter, Monarch, and active Monarch trial access use consistent plan checks across navigation and API routes.
+- **Safer scheduling:** Per-user quest generation uses database-backed locks, and scheduled jobs use durable run records to reduce duplicate work across server instances and restarts.
+- **Reliability and operations:** AI requests time out and fall back to local quest generation. Readiness is available at `/ready`, and admins can inspect process-local operational counters at `/api/v1/ops/metrics`.
+- **Account controls:** Data exports include the full available account history without fixed record caps and exclude credentials. Account deletion removes goals and cleans up personal guild references.
+- **Accessibility and performance:** Mobile navigation supports keyboard focus management and Escape-to-close, animations respect reduced-motion preferences, and the client build splits shared libraries into smaller route-friendly chunks.
+
+## Upcoming features
+
+### Mana Inventory
+
+The planned Inventory will add an in-app Mana economy and collectible items designed for the Solo Leveling System theme. Possible items include profile frames, Hunter avatars, animated orbs, banners, and collectible posters inspired by ranks, gates, shadows, and Monarchs.
+
+Mana may also be used for limited-duration access options, such as a three-day Monarch pass. Pricing, how Mana is earned or purchased, item availability, and the final feature set are still to be decided. Inventory and Mana purchases are **planned and are not currently available**.
+
 ## Application architecture
 
 This repository contains a React client and a Node.js API. MongoDB stores application data, while Socket.IO supports real-time updates.
@@ -109,6 +130,12 @@ Build the client from the `client` directory:
 
 ```bash
 npm run build
+```
+
+Run the server's automated checks from the `server` directory:
+
+```bash
+npm test
 ```
 
 Run the API with `npm start` from the `server` directory. Production deployments should use HTTPS, strong unique secrets, a production MongoDB URI, and exact client origins in the server configuration.

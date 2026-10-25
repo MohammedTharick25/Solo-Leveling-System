@@ -4,6 +4,7 @@ import userController from "./user.controller.js";
 import { protect } from "../../middleware/auth.middleware.js";
 import { validate } from "../../middleware/validate.middleware.js";
 import { upload } from "../../lib/cloudinary.js";
+import { isValidTimeZone } from "../../lib/timeZones.js";
 
 const router = Router();
 router.use(protect);
@@ -18,7 +19,7 @@ router.patch(
   "/me",
   [
     body("country").optional().isString().isLength({ max: 80 }),
-    body("timezone").optional().isString().isLength({ max: 100 }),
+    body("timezone").optional().isString().isLength({ max: 100 }).bail().custom(isValidTimeZone).withMessage("Enter a valid IANA timezone."),
     body("bio").optional().isString().isLength({ max: 240 }),
     body("hunterName")
       .optional()

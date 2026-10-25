@@ -88,12 +88,12 @@ const QUICK_START_STEPS = [
   },
   {
     ...STEPS[1],
-    title: "Make progress with one quest",
-    description: "Quests turn a big intention into a small action you can finish today. Complete a quest to build momentum and see your progress grow.",
+    title: "Follow a training plan",
+    description: "One daily quest advances your main goal. The other quests train your lowest stats, which the System checks again each day so your plan can adapt. Tasks stay practical and scale to your time. At midnight, each unfinished quest expires and deducts a random 5–25 XP based on its reward (up to the XP you currently have).",
     emoji: "⚔️",
     accent: "TODAY’S ACTION",
     icon: Check,
-    tips: ["Pick a task you can finish today", "Link it to a goal when it fits", "Consistency matters more than a perfect day"],
+    tips: ["Start with your main-goal quest", "Weakest stats are retargeted every day", "Missed quests show the exact XP deduction in your archive"],
   },
   {
     ...STEPS[3],

@@ -19,8 +19,10 @@ import Goal from "../goals/goal.model.js";
 import Leaderboard from "../leaderboard/leaderboard.model.js";
 import Guild from "../guild/guild.model.js";
 import RefreshToken from "../auth/auth.model.js";
+import ScheduledRun from "../../infrastructure/scheduler/scheduledRun.model.js";
 import cloudinary from "../../lib/cloudinary.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
+import { isValidTimeZone } from "../../lib/timeZones.js";
 import { cancelSubscription } from "../billing/billing.service.js";
 
 const DEFAULT_SETTINGS = {
@@ -608,7 +610,11 @@ class UserService {
 
     if (updates.bio) updates.bio = updates.bio.trim().slice(0, 240);
     if (updates.country) updates.country = updates.country.trim().slice(0, 80);
-    if (updates.timezone) updates.timezone = updates.timezone.trim().slice(0, 100);
+    if (Object.hasOwn(updates, "timezone")) {
+      updates.timezone = updates.timezone.trim();
+      if (!isValidTimeZone(updates.timezone)) throw new AppError("Enter a valid IANA timezone, such as Asia/Kolkata.", 400);
+      updates.timezoneSet = true;
+    }
 
     const user = await userRepository.updateById(userId, updates);
     if (!user) throw new AppError("User not found", 404);
@@ -730,18 +736,49 @@ class UserService {
       } catch {}
     }
 
-    // Reassign or remove guilds led by the account before removing membership.
-    const ledGuilds = await Guild.find({ leaderId: id }).lean();
-    for (const guild of ledGuilds) {
-      const remaining = (guild.members || []).filter((member) => String(member.userId) !== String(id));
-      if (remaining.length) {
-        await Guild.updateOne(
-          { _id: guild._id },
-          { $set: { leaderId: remaining[0].userId }, $pull: { members: { userId: id } } },
-        );
-      } else {
-        await Guild.deleteOne({ _id: guild._id });
+    // Remove the account's references from guild activity and transfer guilds
+    // it led so no surviving record points at a deleted user.
+    const guilds = await Guild.find({
+      $or: [
+        { leaderId: id },
+        { "members.userId": id },
+        { "challenges.completedBy": id },
+        { "challenges.firstCompleterId": id },
+        { "sprints.createdBy": id },
+        { "sprints.participants.userId": id },
+        { "weeklyQuest.participants.userId": id },
+        { "checkIns.userId": id },
+        { "activityFeed.userId": id },
+      ],
+    });
+    for (const guild of guilds) {
+      const deletedUserWasLeader = String(guild.leaderId) === String(id);
+      guild.members = (guild.members || []).filter((member) => String(member.userId) !== String(id));
+      if (deletedUserWasLeader || !guild.members.some((member) => String(member.userId) === String(guild.leaderId))) {
+        const nextLeader = guild.members[0]?.userId;
+        if (!nextLeader) {
+          await Guild.deleteOne({ _id: guild._id });
+          continue;
+        }
+        guild.leaderId = nextLeader;
+        guild.members.forEach((member) => {
+          member.role = String(member.userId) === String(nextLeader) ? "leader" : member.role === "leader" ? "member" : member.role;
+        });
       }
+      for (const challenge of guild.challenges || []) {
+        challenge.completedBy = (challenge.completedBy || []).filter((userIdValue) => String(userIdValue) !== String(id));
+        if (String(challenge.firstCompleterId || "") === String(id)) challenge.firstCompleterId = null;
+      }
+      for (const sprint of guild.sprints || []) {
+        sprint.participants = (sprint.participants || []).filter((participant) => String(participant.userId) !== String(id));
+        if (String(sprint.createdBy) === String(id)) sprint.createdBy = guild.leaderId;
+      }
+      if (guild.weeklyQuest) {
+        guild.weeklyQuest.participants = (guild.weeklyQuest.participants || []).filter((participant) => String(participant.userId) !== String(id));
+      }
+      guild.checkIns = (guild.checkIns || []).filter((checkIn) => String(checkIn.userId) !== String(id));
+      guild.activityFeed = (guild.activityFeed || []).filter((activity) => String(activity.userId) !== String(id));
+      await guild.save();
     }
 
     await Promise.all([
@@ -749,6 +786,7 @@ class UserService {
       Hunter.updateMany({}, { $pull: { friends: id } }),
       Stats.deleteOne({ userId: id }),
       Quest.deleteMany({ userId: id }),
+      Goal.deleteMany({ userId: id }),
       Shadow.deleteMany({ userId: id }),
       Boss.deleteMany({ userId: id }),
       Dungeon.deleteMany({ userId: id }),
@@ -761,6 +799,7 @@ class UserService {
       Notification.deleteMany({ userId: id }),
       HunterReport.deleteMany({ userId: id }),
       RefreshToken.deleteMany({ userId: id }),
+      ScheduledRun.deleteMany({ _id: { $regex: `^daily:${String(id)}:` } }),
       Leaderboard.updateMany({}, { $pull: { entries: { userId: id } } }),
       Guild.updateMany({ "members.userId": id }, { $pull: { members: { userId: id } } }),
     ]);
@@ -788,29 +827,27 @@ class UserService {
       notifications,
       reports,
     ] = await Promise.all([
-      User.findById(userId).lean(),
+      User.findById(userId)
+        .select("-password -passwordResetTokenHash -passwordResetExpiresAt -pushSubscriptions -lastStreakReminderDate -dailyQuestGenerationLockUntil")
+        .lean(),
       Hunter.findOne({ userId }).lean(),
       Stats.findOne({ userId }).lean(),
-      Quest.find({ userId }).sort({ createdAt: -1 }).limit(1000).lean(),
-      Goal.find({ userId }).sort({ createdAt: -1 }).limit(500).lean(),
-      FocusSession.find({ userId }).sort({ startedAt: -1 }).limit(2000).lean(),
+      Quest.find({ userId }).sort({ createdAt: -1 }).lean(),
+      Goal.find({ userId }).sort({ createdAt: -1 }).lean(),
+      FocusSession.find({ userId }).sort({ startedAt: -1 }).lean(),
       Shadow.find({ userId }).lean(),
-      Boss.find({ userId }).sort({ createdAt: -1 }).limit(500).lean(),
-      Dungeon.find({ userId }).sort({ createdAt: -1 }).limit(500).lean(),
-      TaskRaid.find({ userId }).sort({ createdAt: -1 }).limit(500).lean(),
-      KnowledgeNote.find({ userId }).sort({ updatedAt: -1 }).limit(2000).lean(),
-      Analytics.find({ userId }).sort({ date: -1 }).limit(365).lean(),
+      Boss.find({ userId }).sort({ createdAt: -1 }).lean(),
+      Dungeon.find({ userId }).sort({ createdAt: -1 }).lean(),
+      TaskRaid.find({ userId }).sort({ createdAt: -1 }).lean(),
+      KnowledgeNote.find({ userId }).sort({ updatedAt: -1 }).lean(),
+      Analytics.find({ userId }).sort({ date: -1 }).lean(),
       Habit.find({ userId }).lean(),
-      Journal.find({ userId }).sort({ date: -1 }).limit(365).lean(),
-      Notification.find({ userId }).sort({ createdAt: -1 }).limit(500).lean(),
-      HunterReport.find({ userId }).sort({ weekStart: -1 }).limit(100).lean(),
+      Journal.find({ userId }).sort({ date: -1 }).lean(),
+      Notification.find({ userId }).sort({ createdAt: -1 }).lean(),
+      HunterReport.find({ userId }).sort({ weekStart: -1 }).lean(),
     ]);
 
     if (!user) throw new AppError("User not found", 404);
-    delete user.password;
-    delete user.passwordResetTokenHash;
-    delete user.passwordResetExpiresAt;
-
     return {
       exportedAt: new Date().toISOString(),
       user,

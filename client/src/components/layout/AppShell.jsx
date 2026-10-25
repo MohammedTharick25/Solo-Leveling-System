@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
 import TopNav from "./TopNav.jsx";
@@ -8,7 +8,20 @@ import { useHunterStore } from "../../stores/hunterStore.js";
 
 export default function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { setHunter, setStats, setSettings } = useHunterStore();
+  const menuButtonRef = useRef(null);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  const { user, setUser, setHunter, setStats, setSettings } = useHunterStore();
+
+  useQuery({
+    queryKey: ["user-me", user?._id || user?.id || "current"],
+    queryFn: async () => {
+      const { data } = await api.get("/users/me");
+      setUser(data.data.user);
+      return data.data.user;
+    },
+    staleTime: user ? 1000 * 60 * 5 : 0,
+  });
+
 
   // Fetch server-side settings on every authenticated app mount so notification
   // and preference changes survive refreshes and are never based only on localStorage.
@@ -35,7 +48,7 @@ export default function AppShell() {
   });
 
   return (
-    <div className="flex h-screen bg-slate-950 overflow-hidden">
+    <div className="flex h-screen min-h-0 bg-slate-950 overflow-hidden" style={{ height: "100dvh" }}>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[1000] focus:rounded-xl focus:bg-cyan-300 focus:px-4 focus:py-3 focus:font-bold focus:text-slate-950"
@@ -43,7 +56,7 @@ export default function AppShell() {
         Skip to main content
       </a>
       {/* Sidebar */}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar open={sidebarOpen} onClose={closeSidebar} triggerRef={menuButtonRef} />
 
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -51,15 +64,15 @@ export default function AppShell() {
           aria-hidden="true"
           role="presentation"
           className="fixed inset-0 z-20 bg-black/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeSidebar}
         />
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TopNav onMenuClick={() => setSidebarOpen(true)} menuOpen={sidebarOpen} />
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+        <TopNav onMenuClick={() => setSidebarOpen((open) => !open)} menuOpen={sidebarOpen} menuButtonRef={menuButtonRef} />
 
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none">
+        <main id="main-content" tabIndex={-1} className="flex-1 min-h-0 overflow-y-auto focus:outline-none">
           {/* Background radial glow */}
           <div className="pointer-events-none fixed inset-0 bg-hero-gradient opacity-60" />
 

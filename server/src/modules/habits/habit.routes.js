@@ -1,13 +1,13 @@
 import Habit from "./habit.model.js";
+import User from "../user/user.model.js";
 import { awardXP, awardStatGains } from "../hunter/hunter.service.js";
 import { checkAndAwardAchievements } from "../achievements/achievement.service.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
 import {
   sendSuccess,
   asyncHandler,
-  startOfDay,
-  endOfDay,
 } from "../../lib/helpers.js";
+import { getZonedDayBounds, getZonedWeekday, normalizeTimeZone } from "../../lib/timeZones.js";
 import { Router } from "express";
 import { protect, requireAwakened } from "../../middleware/auth.middleware.js";
 import { body } from "express-validator";
@@ -20,10 +20,10 @@ export const createHabit = async (userId, data) => {
 };
 
 export const getHabits = async (userId) => {
-  const today = new Date();
-  const dayOfWeek = today.getDay(); // 0=Sun … 6=Sat
-  const todayStart = startOfDay();
-  const todayEnd = endOfDay();
+  const user = await User.findById(userId).select("timezone").lean();
+  const timezone = normalizeTimeZone(user?.timezone);
+  const { start: todayStart, end: todayEnd } = getZonedDayBounds(new Date(), timezone);
+  const dayOfWeek = getZonedWeekday(new Date(), timezone);
 
   const habits = await Habit.find({ userId, isActive: true }).sort({
     createdAt: 1,
@@ -50,30 +50,34 @@ export const getHabits = async (userId) => {
   });
 };
 
-const getPreviousScheduledDay = (habit, todayStart) => {
+const getPreviousScheduledDay = (habit, todayStart, timezone) => {
   const customDays = new Set(habit.targetDays || []);
 
   for (let offset = 1; offset <= 7; offset += 1) {
-    const candidate = new Date(todayStart);
-    candidate.setUTCDate(candidate.getUTCDate() - offset);
-    const day = candidate.getUTCDay();
+    const previousInstant = new Date(todayStart.getTime() - 1);
+    const candidate = getZonedDayBounds(previousInstant, timezone);
+    let candidateStart = candidate.start;
+    for (let step = 1; step < offset; step += 1) {
+      candidateStart = getZonedDayBounds(new Date(candidateStart.getTime() - 1), timezone).start;
+    }
+    const day = getZonedWeekday(candidateStart, timezone);
     const scheduled =
       habit.frequency === "daily" ||
       (habit.frequency === "weekdays" && day >= 1 && day <= 5) ||
       (habit.frequency === "weekends" && (day === 0 || day === 6)) ||
       (habit.frequency === "custom" && customDays.has(day));
 
-    if (scheduled) return startOfDay(candidate);
+    if (scheduled) return { start: candidateStart, end: getZonedDayBounds(candidateStart, timezone).end };
   }
 
   return null;
 };
 export const completeHabit = async (habitId, userId, note = "", io = null) => {
+  const user = await User.findById(userId).select("timezone").lean();
+  const timezone = normalizeTimeZone(user?.timezone);
+  const { start: todayStart, end: todayEnd } = getZonedDayBounds(new Date(), timezone);
   const habit = await Habit.findOne({ _id: habitId, userId, isActive: true });
   if (!habit) throw new AppError("Habit not found.", 404);
-
-  const todayStart = startOfDay();
-  const todayEnd = endOfDay();
 
   const alreadyDone = habit.completions.some((c) => {
     const d = new Date(c.date);
@@ -91,12 +95,12 @@ export const completeHabit = async (habitId, userId, note = "", io = null) => {
   );
 
   // Keep a streak across days when this habit is not scheduled.
-  const previousScheduledDay = getPreviousScheduledDay(habit, todayStart);
+  const previousScheduledDay = getPreviousScheduledDay(habit, todayStart, timezone);
   const completedPreviousSchedule =
     previousScheduledDay &&
     habit.completions.some((completion) => {
       const date = new Date(completion.date);
-      return date >= previousScheduledDay && date <= endOfDay(previousScheduledDay);
+      return date >= previousScheduledDay.start && date <= previousScheduledDay.end;
     });
 
   habit.currentStreak = completedPreviousSchedule
@@ -123,11 +127,10 @@ export const completeHabit = async (habitId, userId, note = "", io = null) => {
 };
 
 export const uncompleteHabit = async (habitId, userId) => {
+  const user = await User.findById(userId).select("timezone").lean();
+  const { start: todayStart, end: todayEnd } = getZonedDayBounds(new Date(), normalizeTimeZone(user?.timezone));
   const habit = await Habit.findOne({ _id: habitId, userId });
   if (!habit) throw new AppError("Habit not found.", 404);
-
-  const todayStart = startOfDay();
-  const todayEnd = endOfDay();
 
   const before = habit.completions.length;
   habit.completions = habit.completions.filter((c) => {
@@ -164,9 +167,9 @@ export const deleteHabit = async (habitId, userId) => {
 };
 
 export const getHabitStats = async (userId) => {
+  const user = await User.findById(userId).select("timezone").lean();
+  const { start: today, end: todayEnd } = getZonedDayBounds(new Date(), normalizeTimeZone(user?.timezone));
   const habits = await Habit.find({ userId, isActive: true });
-  const today = startOfDay();
-  const todayEnd = endOfDay();
   const last7 = new Date(Date.now() - 7 * 86400000);
   const last30 = new Date(Date.now() - 30 * 86400000);
 

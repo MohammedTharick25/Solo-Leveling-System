@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { MotionConfig } from 'framer-motion';
 import AppRouter from './router/AppRouter.jsx';
 import { useHunterStore } from './stores/hunterStore.js';
 import { useSocket } from './hooks/useSocket.js';
@@ -11,15 +11,17 @@ export default function App() {
   const { token } = useHunterStore();
   useSocket();
   return (
-    <ErrorBoundary>
-      <AppRouter />
-      {token && (
-        <>
-          <SystemNotificationOverlay />
-          <LevelUpCinematic />
-          <RankUpCinematic />
-        </>
-      )}
-    </ErrorBoundary>
+    <MotionConfig reducedMotion="user">
+      <ErrorBoundary>
+        <AppRouter />
+        {token && (
+          <>
+            <SystemNotificationOverlay />
+            <LevelUpCinematic />
+            <RankUpCinematic />
+          </>
+        )}
+      </ErrorBoundary>
+    </MotionConfig>
   );
 }

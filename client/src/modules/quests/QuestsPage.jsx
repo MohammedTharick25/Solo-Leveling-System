@@ -29,6 +29,7 @@ import { pageVariants } from "../../lib/animations.js";
 import { EmptyState, DiffBadge, Button } from "../../components/ui/PageLoader.jsx";
 import { useHunterStore } from "../../stores/hunterStore.js";
 import { syncProgressionQueries } from "../../lib/systemSync.js";
+import { STAT_LABELS } from "../../lib/xpFormulas.js";
 
 const CATEGORY_CONFIG = {
   focus: { icon: Target, color: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/25", bar: "bg-cyan-400" },
@@ -56,7 +57,7 @@ export default function QuestsPage() {
   const [filter, setFilter] = useState("all");
   const queryClient = useQueryClient();
   const { playQuestComplete } = useAudio();
-  const { hunter } = useHunterStore();
+  const { hunter, stats } = useHunterStore();
 
   const { data: questData, isLoading } = useQuery({
     queryKey: ["quests"],
@@ -91,6 +92,12 @@ export default function QuestsPage() {
     },
   });
 
+  const recoverMutation = useMutation({
+    mutationFn: ({ missedQuestId, replaceQuestId }) =>
+      api.post(`/quests/${missedQuestId}/recover`, { replaceQuestId }),
+    onSuccess: () => syncProgressionQueries(queryClient),
+  });
+
   const quests = questData?.quests || [];
   const total = questData?.total || quests.length;
   const completed = questData?.completed || quests.filter((q) => q.status === "completed").length;
@@ -100,7 +107,8 @@ export default function QuestsPage() {
   const visibleQuests = filter === "active" ? activeQuests : filter === "completed" ? completedQuests : quests;
 
   const totalXp = useMemo(() => quests.reduce((sum, quest) => sum + Number(quest.xpReward || 0), 0), [quests]);
-  const earnedXp = useMemo(() => completedQuests.reduce((sum, quest) => sum + Number(quest.xpReward || 0), 0), [completedQuests]);
+  const earnedXp = useMemo(() => completedQuests.reduce((sum, quest) => sum + Number(quest.earnedXP > 0 ? quest.earnedXP : quest.xpReward || 0), 0), [completedQuests]);
+  const remainingXp = useMemo(() => activeQuests.reduce((sum, quest) => sum + Number(quest.xpReward || 0), 0), [activeQuests]);
   const progressPercent = total ? Math.round((completed / total) * 100) : 0;
 
   return (
@@ -157,7 +165,7 @@ export default function QuestsPage() {
               <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <BoardMetric label="Active" value={activeQuests.length} icon={CircleDot} />
                 <BoardMetric label="Cleared" value={completedQuests.length} icon={CheckCircle2} />
-                <BoardMetric label="Remaining XP" value={Math.max(totalXp - earnedXp, 0)} icon={Zap} />
+                <BoardMetric label="Quest XP left" value={remainingXp} icon={Zap} />
                 <BoardMetric label="Completion" value={`${progressPercent}%`} icon={Gauge} />
               </div>
 
@@ -165,8 +173,9 @@ export default function QuestsPage() {
               <AnimatePresence mode="popLayout">
                 {visibleQuests.map((quest, index) => (
                   <QuestCard
-                    key={quest._id}
+                    key={`${quest._id}:${quest.updatedAt || ""}`}
                     quest={quest}
+                    stats={stats}
                     index={index}
                     completed={quest.status === "completed"}
                     onComplete={() => completeMutation.mutate(quest._id)}
@@ -182,7 +191,11 @@ export default function QuestsPage() {
       ) : historyLoading ? (
         <QuestSkeleton compact />
       ) : (
-        <QuestHistoryList history={historyData?.quests || []} />
+        <QuestHistoryList
+          history={historyData?.quests || []}
+          replaceableQuests={activeQuests.filter((quest) => !quest.recoveryHistory?.length && Number(quest.currentValue || 0) === 0)}
+          recoverMutation={recoverMutation}
+        />
       )}
     </motion.div>
   );
@@ -280,7 +293,7 @@ function TabBtn({ active, onClick, icon: Icon, label }) {
   );
 }
 
-function QuestCard({ quest, index, onComplete, onProgress, completing, completed }) {
+function QuestCard({ quest, stats, index, onComplete, onProgress, completing, completed }) {
   const [inputValue, setInputValue] = useState(quest.currentValue || 0);
   const [expanded, setExpanded] = useState(false);
   const cfg = CATEGORY_CONFIG[quest.category] || CATEGORY_CONFIG.default;
@@ -289,6 +302,9 @@ function QuestCard({ quest, index, onComplete, onProgress, completing, completed
   const current = Number(quest.currentValue || 0);
   const progress = target > 0 ? Math.min((current / target) * 100, 100) : completed ? 100 : 0;
   const unit = quest.unit || "task";
+  const targetStat = quest.targetStat || quest.statRewards?.[0]?.stat;
+  const targetStatReward = quest.statRewards?.find((reward) => reward.stat === targetStat)?.amount;
+  const targetStatValue = quest.targetStatValue ?? stats?.[targetStat]?.value;
 
   return (
     <motion.article
@@ -331,7 +347,7 @@ function QuestCard({ quest, index, onComplete, onProgress, completing, completed
 
           <div className="hidden sm:flex shrink-0 items-center gap-1 rounded-lg border border-yellow-500/10 bg-yellow-500/5 px-2.5 py-1.5">
             <Zap size={12} className="text-yellow-400" />
-            <span className="font-display text-xs font-black text-yellow-300">+{quest.xpReward || 0}</span>
+            <span className="font-display text-xs font-black text-yellow-300">+{completed && quest.earnedXP > 0 ? quest.earnedXP : quest.xpReward || 0}</span>
           </div>
         </div>
 
@@ -340,11 +356,43 @@ function QuestCard({ quest, index, onComplete, onProgress, completing, completed
           <p className="text-sm leading-6 text-slate-300 break-user-content">{quest.description}</p>
         </div>
 
+        {quest.recoveryHistory?.length > 0 && (
+          <p className="mt-3 rounded-xl border border-violet-400/15 bg-violet-400/[0.04] px-4 py-2.5 text-[10px] leading-4 text-violet-200/80">
+            Recovered into today's plan, replacing: <span className="font-bold text-violet-100">{quest.recoveryHistory[quest.recoveryHistory.length - 1].replacedTitle}</span>
+          </p>
+        )}
+
+        {targetStat && targetStatValue !== null && targetStatValue !== undefined && (
+          <div className="mt-3 rounded-xl border border-cyan-500/15 bg-cyan-500/[0.04] px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-[8px] font-black uppercase tracking-[0.18em] text-cyan-400/75">
+                  {quest.targetReason === "main goal" ? "Main goal stat" : "Low stat target"}
+                </p>
+                <p className="mt-1 text-xs font-bold text-slate-200">
+                  {STAT_LABELS[targetStat] || formatCategory(targetStat)}
+                  <span className="ml-2 font-normal text-slate-400">{targetStatValue}/100 {quest.targetStatValue !== null && quest.targetStatValue !== undefined ? "when assigned" : "current"}</span>
+                </p>
+              </div>
+              {targetStatReward && <span className="rounded-lg border border-cyan-400/10 bg-cyan-400/5 px-2.5 py-1.5 text-[10px] font-bold text-cyan-300">+{targetStatReward} stat on completion</span>}
+            </div>
+            <p className="mt-1.5 text-[10px] leading-4 text-slate-500">
+              {quest.targetReason === "main goal"
+                ? "Assigned to move your primary goal forward."
+                : quest.targetReason === "lowest stat"
+                  ? "Selected because this was one of your lowest stats when today's quests were created."
+                  : "Complete this quest to build the displayed stat."}
+            </p>
+          </div>
+        )}
+
         {quest.purpose && (
           <div className="mt-3">
             <button
               type="button"
               onClick={() => setExpanded((value) => !value)}
+              aria-expanded={expanded}
+              aria-controls={expanded ? `quest-purpose-${quest._id}` : undefined}
               className="w-full flex items-center justify-between gap-3 text-left rounded-xl border border-transparent px-1 py-1.5 text-slate-500 hover:text-slate-300 transition-colors"
             >
               <span className="text-[9px] font-black uppercase tracking-[0.18em]">Why this matters</span>
@@ -352,7 +400,7 @@ function QuestCard({ quest, index, onComplete, onProgress, completing, completed
             </button>
             <AnimatePresence initial={false}>
               {expanded && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                <motion.div id={`quest-purpose-${quest._id}`} initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                   <p className="px-1 pb-2 text-xs leading-5 text-slate-500 break-user-content">{quest.purpose}</p>
                   {quest.expectedOutcome && <p className="px-1 pb-1 text-xs leading-5 text-cyan-400/70 break-user-content"><span className="text-slate-600">Expected outcome:</span> {quest.expectedOutcome}</p>}
                 </motion.div>
@@ -373,7 +421,14 @@ function QuestCard({ quest, index, onComplete, onProgress, completing, completed
             <span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-600">Mission progress</span>
             <span className="font-display text-[10px] font-black text-slate-300">{Math.round(progress)}%</span>
           </div>
-          <div className="h-2.5 rounded-full bg-black/60 border border-white/5 overflow-hidden">
+          <div
+            className="h-2.5 rounded-full bg-black/60 border border-white/5 overflow-hidden"
+            role="progressbar"
+            aria-label={`Mission progress for ${quest.title}`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progress)}
+          >
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
@@ -452,7 +507,8 @@ function BoardMetric({ label, value, icon: Icon }) {
   );
 }
 
-function QuestHistoryList({ history }) {
+function QuestHistoryList({ history, replaceableQuests, recoverMutation }) {
+  const [replacementFor, setReplacementFor] = useState({});
   if (!history.length) {
     return <EmptyState icon={History} title="No Quest History" description="Completed and expired missions will appear here once you build your record." />;
   }
@@ -486,14 +542,48 @@ function QuestHistoryList({ history }) {
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[9px] text-slate-600">
                   <span>{quest.updatedAt ? new Date(quest.updatedAt).toLocaleDateString() : "—"}</span>
                   <span>•</span>
-                  <span>{quest.status === "completed" ? "Completed" : "Incomplete"}</span>
+                  <span>{quest.status === "completed" ? "Completed" : quest.status === "recovered" ? "Recovered into today’s plan" : "Incomplete"}</span>
+                  {quest.status !== "completed" && Number(quest.xpPenalty) > 0 && <span className="text-red-400">−{quest.xpPenalty} XP penalty</span>}
                 </div>
               </div>
               <div className="hidden sm:flex items-center gap-4">
                 <DiffBadge diff={quest.difficulty} />
-                {quest.status === "completed" && <span className="font-display text-xs font-black text-yellow-400">+{quest.xpReward || 0} XP</span>}
+                {quest.status === "completed" && <span className="font-display text-xs font-black text-yellow-400">+{(quest.earnedXP > 0 ? quest.earnedXP : quest.xpReward) || 0} XP</span>}
+                {quest.status !== "completed" && Number(quest.xpPenalty) > 0 && <span className="font-display text-xs font-black text-red-400">−{quest.xpPenalty} XP</span>}
               </div>
             </div>
+            {quest.status === "expired" && replaceableQuests.length > 0 && (
+              <div className="mt-4 border-t border-white/5 pt-4">
+                <p className="text-[10px] leading-4 text-slate-400">Recover this task by swapping it for an untouched quest in today’s plan. The XP deduction remains, and today’s quest count stays the same.</p>
+                {recoverMutation.isError && <p role="alert" className="mt-2 text-[10px] text-red-300">{recoverMutation.error?.response?.data?.message || "The quest could not be recovered. Refresh the plan and try again."}</p>}
+                {replaceableQuests.length === 0 ? (
+                  <p className="mt-3 text-[10px] text-slate-500">No untouched active quest remains to swap.</p>
+                ) : (
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <select
+                    value={replacementFor[quest._id] || ""}
+                    onChange={(event) => {
+                      recoverMutation.reset();
+                      setReplacementFor((current) => ({ ...current, [quest._id]: event.target.value }));
+                    }}
+                    className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-slate-200 outline-none focus:border-cyan-500/50"
+                    aria-label={`Choose today's quest to replace for ${quest.title}`}
+                  >
+                    <option value="">Choose a current quest to replace</option>
+                    {replaceableQuests.map((activeQuest) => <option key={activeQuest._id} value={activeQuest._id}>{activeQuest.title}</option>)}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!replacementFor[quest._id] || recoverMutation.isPending}
+                    onClick={() => recoverMutation.mutate({ missedQuestId: quest._id, replaceQuestId: replacementFor[quest._id] })}
+                    className="rounded-xl bg-cyan-400 px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Recover quest
+                  </button>
+                </div>
+                )}
+              </div>
+            )}
           </motion.div>
         ))}
       </div>

@@ -1,14 +1,18 @@
 import cron from "node-cron";
 import User from "../../modules/user/user.model.js";
-import Quest from "../../modules/quest/quest.model.js";
 import Guild from "../../modules/guild/guild.model.js";
-import { generateQuestsForUser } from "../../modules/quest/quest.service.js";
+import { generateQuestsForUser, expireMissedQuests } from "../../modules/quest/quest.service.js";
 import { computeAndSaveStats } from "../../modules/stats/stats.service.js";
 import { generateWeeklyReport } from "../../modules/report/report.routes.js";
 import { rebuildLeaderboard } from "../../modules/leaderboard/leaderboard.routes.js";
 import { checkAndUpdateStreaks } from "../../modules/hunter/hunter.service.js";
 import { recordDailySnapshot } from "../../modules/analytics/analytics.routes.js";
 import { sendDueStreakReminders } from "../../modules/notification/push.service.js";
+import { getZonedDateKey, getZonedDateTimeParts, normalizeTimeZone } from "../../lib/timeZones.js";
+import { recordOpsEvent } from "../../lib/opsMetrics.js";
+import { runScheduledOnce } from "./runScheduledOnce.js";
+
+const dailyRunDates = new Map();
 
 export const startCronJobs = (io) => {
   console.log("[CRON] Scheduler started");
@@ -16,122 +20,105 @@ export const startCronJobs = (io) => {
   cron.schedule("* * * * *", async () => {
     try {
       await sendDueStreakReminders();
+      const users = await User.find({ isActive: true, isAwakened: true }).select("_id timezone").lean();
+      const now = new Date();
+      for (const user of users) {
+        const local = getZonedDateTimeParts(now, normalizeTimeZone(user.timezone));
+        const dayKey = getZonedDateKey(now, normalizeTimeZone(user.timezone));
+        let runState = dailyRunDates.get(String(user._id));
+        const timezone = normalizeTimeZone(user.timezone);
+        if (!runState || runState.dayKey !== dayKey || runState.timezone !== timezone) {
+          runState = { dayKey, timezone };
+          dailyRunDates.set(String(user._id), runState);
+        }
+        const localMinute = local.hour * 60 + local.minute;
+        try {
+          if (!runState.streak && localMinute >= 1) {
+            const ran = await runScheduledOnce(
+              `daily:${user._id}:${dayKey}:streak`,
+              () => checkAndUpdateStreaks(user._id, io),
+            );
+            if (!ran) continue;
+            runState.streak = true;
+          }
+          if (!runState.expiry && localMinute >= 2) {
+            const ran = await runScheduledOnce(
+              `daily:${user._id}:${dayKey}:expiry`,
+              () => expireMissedQuests(user._id, io, now),
+            );
+            if (!ran) continue;
+            runState.expiry = true;
+          }
+          if (!runState.quests && localMinute >= 360) {
+            const ran = await runScheduledOnce(
+              `daily:${user._id}:${dayKey}:quests`,
+              () => generateQuestsForUser(user._id, io),
+            );
+            if (!ran) continue;
+            runState.quests = true;
+          }
+          if (!runState.snapshot && localMinute >= 1435) {
+            const ran = await runScheduledOnce(
+              `daily:${user._id}:${dayKey}:snapshot`,
+              () => recordDailySnapshot(user._id),
+            );
+            if (!ran) continue;
+            runState.snapshot = true;
+          }
+        } catch (error) {
+          recordOpsEvent("scheduler", "local_daily_task_failed", "error", error);
+          console.error(`[CRON] Local-day task failed for ${user._id}: ${error.message}`);
+        }
+      }
     } catch (error) {
+      recordOpsEvent("scheduler", "minute_scheduler_failed", "error", error);
       console.error("[CRON] Device streak reminder delivery failed:", error.message);
     }
   });
 
-  // ── Midnight: check streaks FIRST, then expire old quests ─────────────────
-  // Run at 00:01 so the day has clearly rolled over
-  cron.schedule("1 0 * * *", async () => {
-    console.log("[CRON] Midnight streak check...");
-    try {
-      const users = await User.find({ isActive: true, isAwakened: true })
-        .select("_id")
-        .lean();
-      for (const user of users) {
-        try {
-          await checkAndUpdateStreaks(user._id, io);
-        } catch (err) {
-          console.error(
-            `[CRON] Streak check failed for ${user._id}: ${err.message}`,
-          );
-        }
-      }
-      console.log(`[CRON] Streak check complete for ${users.length} users.`);
-    } catch (err) {
-      console.error("[CRON] Streak check error:", err.message);
-    }
-  });
-
-  // ── Expire active quests from previous days at 00:02 ──────────────────────
-  cron.schedule("2 0 * * *", async () => {
-    console.log("[CRON] Expiring old quests...");
-    try {
-      const yesterday = new Date();
-      yesterday.setHours(0, 0, 0, 0); // start of today = end of yesterday
-      const result = await Quest.updateMany(
-        { status: "active", dueAt: { $lt: yesterday } },
-        { status: "expired" },
-      );
-      console.log(`[CRON] Expired ${result.modifiedCount} quests.`);
-    } catch (err) {
-      console.error("[CRON] Quest expiry error:", err.message);
-    }
-  });
-
-  // ── 6:00 AM: Generate today's 5 daily quests for every user ───────────────
-  cron.schedule("0 6 * * *", async () => {
-    console.log("[CRON] Daily quest generation...");
-    try {
-      const users = await User.find({ isActive: true, isAwakened: true })
-        .select("_id")
-        .lean();
-      let totalGenerated = 0;
-      for (const user of users) {
-        try {
-          const quests = await generateQuestsForUser(user._id, io);
-          totalGenerated += quests.length;
-        } catch (err) {
-          console.error(
-            `[CRON] Quest gen failed for ${user._id}: ${err.message}`,
-          );
-        }
-      }
-      console.log(
-        `[CRON] Generated ${totalGenerated} quests for ${users.length} users.`,
-      );
-    } catch (err) {
-      console.error("[CRON] Quest generation error:", err.message);
-    }
-  });
-
-  // ── Every 4 hours: recompute productivity stats ────────────────────────────
+  // Recompute productivity stats every four hours.
   cron.schedule("0 */4 * * *", async () => {
     console.log("[CRON] Stats recompute...");
     try {
-      const users = await User.find({ isActive: true }).select("_id").lean();
-      for (const user of users) {
-        try {
-          await computeAndSaveStats(user._id);
-        } catch {}
-      }
+      const now = new Date();
+      const runKey = `stats:${now.toISOString().slice(0, 10)}:${String(now.getUTCHours()).padStart(2, "0")}`;
+      await runScheduledOnce(runKey, async () => {
+        const users = await User.find({ isActive: true }).select("_id").lean();
+        for (const user of users) {
+          try {
+            await computeAndSaveStats(user._id);
+          } catch (error) {
+            recordOpsEvent("scheduler", "stats_recompute_user_failed", "error", error);
+          }
+        }
+      });
       console.log("[CRON] Stats recompute complete.");
     } catch (err) {
+      recordOpsEvent("scheduler", "stats_recompute_failed", "error", err);
       console.error("[CRON] Stats recompute error:", err.message);
     }
   });
 
-  // ── 11:55 PM: Daily analytics snapshot ────────────────────────────────────
-  cron.schedule("55 23 * * *", async () => {
-    console.log("[CRON] Analytics snapshot...");
-    try {
-      const users = await User.find({ isActive: true }).select("_id").lean();
-      for (const user of users) {
-        try {
-          await recordDailySnapshot(user._id);
-        } catch {}
-      }
-      console.log("[CRON] Analytics snapshot complete.");
-    } catch (err) {
-      console.error("[CRON] Analytics snapshot error:", err.message);
-    }
-  });
-
-  // ── Monday 00:05 UTC: Generate weekly Hunter Reports ──────────────────────────
+  // Generate weekly Hunter reports every Monday at 00:05 UTC.
   cron.schedule("5 0 * * 1", async () => {
     console.log("[CRON] Weekly reports...");
     try {
-      const users = await User.find({ isActive: true, isAwakened: true })
-        .select("_id")
-        .lean();
-      for (const user of users) {
-        try {
-          await generateWeeklyReport(user._id, io);
-        } catch {}
-      }
+      const runKey = `weekly-reports:${new Date().toISOString().slice(0, 10)}`;
+      await runScheduledOnce(runKey, async () => {
+        const users = await User.find({ isActive: true, isAwakened: true })
+          .select("_id")
+          .lean();
+        for (const user of users) {
+          try {
+            await generateWeeklyReport(user._id, io);
+          } catch (error) {
+            recordOpsEvent("scheduler", "weekly_report_user_failed", "error", error);
+          }
+        }
+      });
       console.log("[CRON] Weekly reports complete.");
     } catch (err) {
+      recordOpsEvent("scheduler", "weekly_reports_failed", "error", err);
       console.error("[CRON] Weekly reports error:", err.message);
     }
   }, { timezone: "UTC" });
@@ -140,9 +127,11 @@ export const startCronJobs = (io) => {
   cron.schedule("0 1 * * *", async () => {
     console.log("[CRON] Leaderboard rebuild...");
     try {
-      await rebuildLeaderboard("global", "weekly");
+      const runKey = `leaderboard:${new Date().toISOString().slice(0, 10)}`;
+      await runScheduledOnce(runKey, () => rebuildLeaderboard("global", "weekly"));
       console.log("[CRON] Leaderboard rebuild complete.");
     } catch (err) {
+      recordOpsEvent("scheduler", "leaderboard_rebuild_failed", "error", err);
       console.error("[CRON] Leaderboard rebuild error:", err.message);
     }
   });
@@ -150,9 +139,11 @@ export const startCronJobs = (io) => {
   // ── Monday 00:01: Reset guild weekly XP ───────────────────────────────────
   cron.schedule("1 0 * * 1", async () => {
     try {
-      await Guild.updateMany({}, { weeklyXP: 0 });
+      const runKey = `guild-weekly-reset:${new Date().toISOString().slice(0, 10)}`;
+      await runScheduledOnce(runKey, () => Guild.updateMany({}, { weeklyXP: 0 }));
       console.log("[CRON] Guild weekly XP reset.");
     } catch (err) {
+      recordOpsEvent("scheduler", "guild_weekly_reset_failed", "error", err);
       console.error("[CRON] Guild XP reset error:", err.message);
     }
   });

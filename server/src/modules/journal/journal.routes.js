@@ -1,12 +1,12 @@
 import Journal from "./journal.model.js";
+import User from "../user/user.model.js";
 import { awardXP, updateStreak } from "../hunter/hunter.service.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
 import {
   sendSuccess,
   asyncHandler,
-  startOfDay,
-  endOfDay,
 } from "../../lib/helpers.js";
+import { getZonedDayBounds, getZonedDayBoundsForKey, normalizeTimeZone } from "../../lib/timeZones.js";
 import { Router } from "express";
 import { protect, requireAwakened } from "../../middleware/auth.middleware.js";
 
@@ -71,7 +71,10 @@ const analyzeJournalPatterns = (entries) => {
 // ── Service ──────────────────────────────────────────────────────────────────
 
 export const createOrUpdateEntry = async (userId, data, io = null) => {
-  const date = data.date ? startOfDay(new Date(data.date)) : startOfDay();
+  const user = await User.findById(userId).select("timezone").lean();
+  const { start: date, end } = data.date
+    ? getZonedDayBoundsForKey(data.date, normalizeTimeZone(user?.timezone))
+    : getZonedDayBounds(new Date(), normalizeTimeZone(user?.timezone));
 
   const wordCount = [
     ...(data.wins || []),
@@ -85,7 +88,7 @@ export const createOrUpdateEntry = async (userId, data, io = null) => {
 
   const existing = await Journal.findOne({
     userId,
-    date: { $gte: date, $lte: endOfDay(date) },
+    date: { $gte: date, $lte: end },
   });
 
   let entry;
@@ -102,10 +105,13 @@ export const createOrUpdateEntry = async (userId, data, io = null) => {
 };
 
 export const getEntry = async (userId, dateStr) => {
-  const date = dateStr ? startOfDay(new Date(dateStr)) : startOfDay();
+  const user = await User.findById(userId).select("timezone").lean();
+  const { start: date, end } = dateStr
+    ? getZonedDayBoundsForKey(dateStr, normalizeTimeZone(user?.timezone))
+    : getZonedDayBounds(new Date(), normalizeTimeZone(user?.timezone));
   return Journal.findOne({
     userId,
-    date: { $gte: date, $lte: endOfDay(date) },
+    date: { $gte: date, $lte: end },
   });
 };
 

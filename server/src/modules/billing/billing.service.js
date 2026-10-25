@@ -115,8 +115,9 @@ export const getPlans = async () => {
   };
 };
 
-const getEffectiveTier = (billing) => {
+export const getEffectiveTier = (billing) => {
   if (billing?.tier === "monarch" && billing.upgradeAccessUntil?.getTime() > Date.now()) return "monarch";
+  if (billing?.trialEndsAt && billing.trialEndsAt.getTime() > Date.now()) return "monarch";
   if (
     billing?.provider === "razorpay" &&
     billing.status === "active" &&
@@ -124,7 +125,6 @@ const getEffectiveTier = (billing) => {
   ) {
     return billing.tier;
   }
-  if (billing?.trialEndsAt && billing.trialEndsAt.getTime() > Date.now()) return "monarch";
   return "free";
 };
 
@@ -156,7 +156,10 @@ const toBillingStatus = (user, billing = {}) => {
   const effectiveTier = getEffectiveTier(billing);
   const activePaidPlan = billing.provider === "razorpay" && billing.status === "active" &&
     (!billing.currentPeriodEnd || billing.currentPeriodEnd.getTime() > Date.now());
-  const isTrialing = Boolean(!activePaidPlan && billing.trialEndsAt && billing.trialEndsAt.getTime() > Date.now());
+  const trialIsValid = Boolean(billing.trialEndsAt && billing.trialEndsAt.getTime() > Date.now());
+  const isTrialing = Boolean(
+    trialIsValid && effectiveTier === "monarch" && !(activePaidPlan && billing.tier === "monarch"),
+  );
   const accessEnd = isTrialing ? billing.trialEndsAt : billing.upgradeAccessUntil || billing.currentPeriodEnd;
   return {
   tier: billing.tier || "free",

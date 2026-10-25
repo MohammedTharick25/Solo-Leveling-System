@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "../../lib/api.js";
-import { Menu, Bell, Flame, Star } from "lucide-react";
+import { Menu, X, Bell, Flame, Star } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useHunterStore } from "../../stores/hunterStore.js";
 import { RANK_COLORS, formatXP } from "../../lib/xpFormulas.js";
 import NotificationPanel from "./NotificationPanel.jsx";
 
-export default function TopNav({ onMenuClick, menuOpen = false }) {
+export default function TopNav({ onMenuClick, menuOpen = false, menuButtonRef }) {
   const { hunter, unreadCount, settings } = useHunterStore();
   const [notifOpen, setNotifOpen] = useState(false);
   const rankColor = RANK_COLORS[hunter?.rank] || "text-slate-400";
@@ -43,14 +43,15 @@ export default function TopNav({ onMenuClick, menuOpen = false }) {
     >
       {/* Mobile menu toggle */}
       <button
+        ref={menuButtonRef}
         onClick={onMenuClick}
         type="button"
-        aria-label="Open navigation menu"
+        aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
         aria-controls="mobile-sidebar"
         aria-expanded={menuOpen}
-        className="lg:hidden p-2 text-slate-400 hover:text-slate-200 transition-colors rounded-lg"
+        className="lg:hidden flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 hover:text-slate-200 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300"
       >
-        <Menu size={20} />
+        {menuOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
       {/* System status pill */}

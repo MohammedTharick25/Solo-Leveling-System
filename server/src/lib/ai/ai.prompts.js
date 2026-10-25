@@ -18,8 +18,8 @@ Rules:
 
 
 
-export const buildDailyQuestPrompt = ({ user, hunter, stats, currentDate }) => `
-Create exactly 5 personalized daily quests for this user.
+export const buildDailyQuestPrompt = ({ user, hunter, stats, currentDate, statTargets = [] }) => `
+  Create exactly 5 personalized daily quests for this user as today's actions inside a progressive training plan.
 
 This is the user's first-party productivity profile collected during onboarding. Treat it as the primary source for personalization.
 
@@ -34,7 +34,20 @@ ${JSON.stringify(hunter, null, 2)}
 CURRENT STATS:
 ${JSON.stringify(stats || {}, null, 2)}
 
-QUEST DESIGN RULES:
+TODAY'S TARGETING ORDER:
+${JSON.stringify(statTargets, null, 2)}
+
+  TRAINING PLAN RULES:
+  - First infer the user's likely starting level, desired outcome, constraints, and the most useful next skill from their profile. Do not ask the user to repeat information already provided.
+  - Build quest 1 around the user's primary goal. Build quests 2–5 around the supplied lowest-stat targets, in order. These targets are recalculated from current stats every day. Each task must genuinely exercise its assigned stat and category; do not give all tasks the same category.
+  - Use the supplied target stat and current value as the authoritative daily priorities. Low values need approachable practice; increase challenge gradually as a stat improves.
+  - Choose the strongest relevant established learning path or practical curriculum for their stated goal (for example, programming fundamentals before projects, or progressive strength and mobility work for fitness). Adapt it to their level and time; do not claim a named certification or source unless certain.
+  - Arrange today's 5 quests as connected steps: learn a small concept, practice it, produce/check an outcome, and reinforce the habit. At least 3 must advance the user's primary goal. Avoid generic filler such as unrelated journaling or exercise when it does not support their priority.
+  - Treat this as a sequence that continues across days. Advance from foundations to guided practice, independent work, and progressively harder projects. Use available completed quest history supplied in the profile to avoid repeating mastered work and to increase difficulty gradually.
+  - Make each task specific enough to start immediately, with a visible deliverable or check for completion. Include the reason it advances the plan.
+  - Never exceed the user's available daily minutes in total; if time is limited, create shorter focused steps.
+
+  QUEST DESIGN RULES:
 - Return exactly 5 quests. Never return 4, 6, or more.
 - Every quest must clearly connect to at least one onboarding goal, learning interest, strength, weakness, schedule, fitness level, occupation/student status, long-term vision, or available daily time.
 - Do not invent goals or personal details that are not in the profile.

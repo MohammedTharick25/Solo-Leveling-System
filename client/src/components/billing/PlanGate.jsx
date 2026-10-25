@@ -34,7 +34,7 @@ export default function PlanGate({ feature, children }) {
   if (billingQuery.isError) {
     return (
       <div className="mx-auto max-w-xl rounded-3xl border border-white/10 bg-slate-950/80 p-8 text-center">
-        <LockKeyhole className="mx-auto text-amber-300" size={28} />
+        <LockKeyhole className={`mx-auto ${requiredTier === "monarch" ? "text-amber-300" : "text-slate-200"}`} size={28} />
         <h1 className="mt-4 font-heading text-xl font-bold text-white">Couldn’t verify your plan</h1>
         <p className="mt-2 text-sm leading-6 text-slate-400">Reconnect to the System and try again. Your access remains protected until your plan can be verified.</p>
         <button onClick={() => billingQuery.refetch()} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-bold text-slate-950"><RefreshCw size={15} /> Try again</button>
@@ -59,7 +59,7 @@ export function FeaturePaywallCard({ feature }) {
     <div className="mx-auto flex min-h-[60vh] max-w-2xl items-center justify-center px-4 py-12">
       <section className="relative w-full overflow-hidden rounded-[2rem] border border-cyan-300/15 bg-slate-950/85 p-8 text-center shadow-2xl shadow-cyan-950/30 sm:p-12">
         <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl" />
-        <span className="relative mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-200"><LockKeyhole size={24} /></span>
+        <span className={`relative mx-auto grid h-14 w-14 place-items-center rounded-2xl border ${details.requiredTier === "monarch" ? "border-amber-300/20 bg-amber-300/10 text-amber-200" : "border-slate-200/20 bg-slate-200/10 text-slate-100"}`}><LockKeyhole size={24} /></span>
         <p className="relative mt-6 text-[10px] font-black uppercase tracking-[0.28em] text-cyan-300">Hunter feature</p>
         <h1 className="relative mt-3 font-heading text-3xl font-black text-white">Unlock {details.label}</h1>
         <p className="relative mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-400">{details.description} Upgrade to {details.requiredTier === "monarch" ? "Monarch" : "Hunter"} to unlock this feature and continue your growth journey.</p>

@@ -25,6 +25,45 @@ const SESSION_TYPES = [
   { type: "reading", label: "Reading", emoji: "📖", duration: 30 },
 ];
 
+const clampMinutes = (minutes) => Math.min(45, Math.max(5, Math.round(minutes)));
+
+const questFocusMinutes = (quest) => {
+  if (!quest) return SESSION_TYPES[0].duration;
+  const unit = String(quest.unit || "").toLowerCase();
+  if (["minute", "minutes", "min"].includes(unit)) {
+    return clampMinutes(Number(quest.targetValue) || 25);
+  }
+
+  const text = `${quest.title || ""} ${quest.description || ""}`;
+  const explicitMinutes = text.match(/\b(\d{1,3})\s*[- ]?\s*(?:focused\s*)?(?:minutes?|mins?)\b/i);
+  if (explicitMinutes) return clampMinutes(Number(explicitMinutes[1]));
+
+  const baseByCategory = {
+    learning: 25,
+    productivity: 25,
+    focus: 25,
+    creativity: 30,
+    communication: 20,
+    leadership: 25,
+    discipline: 20,
+    health: 20,
+    finance: 25,
+    emotionalControl: 15,
+    timeManagement: 20,
+  };
+  const base = baseByCategory[quest.category] || 25;
+  const difficultyBonus = ["B", "A", "S"].includes(quest.difficulty) ? 5 : 0;
+  return clampMinutes(base + difficultyBonus);
+};
+
+const sessionTypeForQuest = (quest) => {
+  const duration = questFocusMinutes(quest);
+  const closest = SESSION_TYPES.reduce((best, item) =>
+    Math.abs(item.duration - duration) < Math.abs(best.duration - duration) ? item : best,
+  SESSION_TYPES[0]);
+  return { ...closest, duration };
+};
+
 export default function PomodoroPage() {
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -162,6 +201,7 @@ export default function PomodoroPage() {
     );
     if (matchingQuest) {
       setLinkedQuestId(matchingQuest._id);
+      setSelectedType(sessionTypeForQuest(matchingQuest));
       if (matchingQuest.goalId) setLinkedGoalId(String(matchingQuest.goalId));
     }
   }, [recommendedAction, questData, persistedSession]);
@@ -300,11 +340,13 @@ export default function PomodoroPage() {
                   {SESSION_TYPES.map((st) => (
                     <button
                       key={st.type}
+                      type="button"
                       onClick={() => setSelectedType(st)}
+                      aria-pressed={selectedType.type === st.type}
                       className={
                         selectedType.type === st.type
-                          ? "flex items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-4 py-2 font-heading text-sm font-semibold text-cyan-400 transition-all"
-                          : "flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 font-heading text-sm font-semibold text-slate-500 transition-all hover:text-slate-300"
+                          ? "flex min-h-11 items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-4 py-2 font-heading text-sm font-semibold text-cyan-400 transition-all"
+                          : "flex min-h-11 items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 font-heading text-sm font-semibold text-slate-500 transition-all hover:text-slate-300"
                       }
                     >
                       <span>{st.emoji}</span>
@@ -323,6 +365,7 @@ export default function PomodoroPage() {
                         (quest) => String(quest.goalId || "") === String(goalId),
                       );
                       setLinkedQuestId(goalQuest?._id || "");
+                      if (goalQuest) setSelectedType(sessionTypeForQuest(goalQuest));
                     }}
                     className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 outline-none focus:border-cyan-500/60"
                   >
@@ -342,6 +385,7 @@ export default function PomodoroPage() {
                       const quest = availableQuests.find(
                         (item) => String(item._id) === String(questId),
                       );
+                      if (quest) setSelectedType(sessionTypeForQuest(quest));
                       setLinkedGoalId(quest?.goalId ? String(quest.goalId) : "");
                     }}
                     className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 outline-none focus:border-cyan-500/60"
@@ -363,7 +407,7 @@ export default function PomodoroPage() {
                     ))}
                   </select>
                   <span className="font-body text-[11px] text-slate-500">
-                    Focus time advances linked quests measured in minutes.
+                    Linking a quest picks a focused 5–45 minute session from its target, instructions, and difficulty. Choose another session above anytime.
                   </span>
                 </label>
               </div>

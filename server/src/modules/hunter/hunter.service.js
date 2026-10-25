@@ -1,4 +1,5 @@
 import Hunter from "./hunter.model.js";
+import User from "../user/user.model.js";
 import Stats from "../stats/stats.model.js";
 import Quest from "../quest/quest.model.js";
 import {
@@ -8,7 +9,8 @@ import {
   streakMultiplier,
 } from "../../lib/xpFormulas.js";
 import { createNotification } from "../notification/notification.service.js";
-import { startOfDay, endOfDay, clamp } from "../../lib/helpers.js";
+import { clamp } from "../../lib/helpers.js";
+import { getZonedDayBounds, normalizeTimeZone } from "../../lib/timeZones.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
 import { emitToUser } from "../../infrastructure/socket/socketManager.js";
 import { recordGuildCelebration } from "../guild/guild.service.js";
@@ -178,11 +180,11 @@ export const awardStatGains = async (userId, statRewards = []) => {
  */
 
 export const updateStreakOnQuestComplete = async (userId, io = null) => {
-  const hunter = await Hunter.findOne({ userId });
+  const [hunter, user] = await Promise.all([Hunter.findOne({ userId }), User.findById(userId).select("timezone").lean()]);
   if (!hunter) return;
 
-  const todayStart = startOfDay();
-  const todayEnd = endOfDay();
+  const timezone = normalizeTimeZone(user?.timezone);
+  const { start: todayStart, end: todayEnd } = getZonedDayBounds(new Date(), timezone);
 
   // Count today's quests
   const [totalToday, completedToday] = await Promise.all([
@@ -201,14 +203,12 @@ export const updateStreakOnQuestComplete = async (userId, io = null) => {
 
   // All quests done for today → update active date so streak persists overnight
   if (totalToday > 0 && completedToday >= totalToday) {
-    const lastActiveDay = hunter.lastActiveDate
-      ? startOfDay(hunter.lastActiveDate)
-      : null;
-    const today = startOfDay();
+    const lastActiveDay = hunter.lastActiveDate ? getZonedDayBounds(hunter.lastActiveDate, timezone).start : null;
+    const today = todayStart;
 
     if (!lastActiveDay || lastActiveDay.getTime() < today.getTime()) {
       // First full completion today
-      const yesterday = startOfDay(new Date(Date.now() - 86400000));
+      const yesterday = getZonedDayBounds(new Date(todayStart.getTime() - 1), timezone).start;
       const wasActivePrev =
         lastActiveDay && lastActiveDay.getTime() === yesterday.getTime();
 
@@ -251,12 +251,12 @@ export const updateStreakOnQuestComplete = async (userId, io = null) => {
  * the current streak but never removes XP or guild progress.
  */
 export const checkAndUpdateStreaks = async (userId, io = null) => {
-  const hunter = await Hunter.findOne({ userId });
+  const [hunter, user] = await Promise.all([Hunter.findOne({ userId }), User.findById(userId).select("timezone").lean()]);
   if (!hunter) return;
 
-  const todayStart = startOfDay();
-  const yesterdayStart = startOfDay(new Date(Date.now() - 86400000));
-  const yesterdayEnd = endOfDay(new Date(Date.now() - 86400000));
+  const timezone = normalizeTimeZone(user?.timezone);
+  const { start: todayStart } = getZonedDayBounds(new Date(), timezone);
+  const { start: yesterdayStart, end: yesterdayEnd } = getZonedDayBounds(new Date(todayStart.getTime() - 1), timezone);
 
   // Was the user even assigned quests yesterday?
   const [totalYesterday, completedYesterday] = await Promise.all([
@@ -274,9 +274,7 @@ export const checkAndUpdateStreaks = async (userId, io = null) => {
   if (totalYesterday === 0) return; // no quests assigned yesterday — no penalty
 
   const allDone = completedYesterday >= totalYesterday;
-  const lastActiveDay = hunter.lastActiveDate
-    ? startOfDay(hunter.lastActiveDate)
-    : null;
+  const lastActiveDay = hunter.lastActiveDate ? getZonedDayBounds(hunter.lastActiveDate, timezone).start : null;
   const completedAllYesterday =
     lastActiveDay && lastActiveDay.getTime() === yesterdayStart.getTime();
 

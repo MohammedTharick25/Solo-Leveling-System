@@ -42,7 +42,7 @@ export const complete = asyncHandler(async (req, res) => {
 });
 
 export const fail = asyncHandler(async (req, res) => {
-  const quest = await questService.failQuest(req.params.id, req.userId);
+  const quest = await questService.failQuest(req.params.id, req.userId, req.app.get("io"));
   sendSuccess(res, { quest }, "Quest marked as failed.");
 });
 
@@ -53,4 +53,14 @@ export const getHistory = asyncHandler(async (req, res) => {
     req.query.limit,
   );
   sendSuccess(res, result, "Quest history retrieved.");
+});
+
+export const recover = asyncHandler(async (req, res) => {
+  const result = await questService.recoverExpiredQuest(
+    req.params.id,
+    req.userId,
+    req.body.replaceQuestId,
+    req.app.get("io"),
+  );
+  sendSuccess(res, result, "Missed quest recovered into today's plan.");
 });

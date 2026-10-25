@@ -52,4 +52,4 @@ export const PLAN_FEATURES = {
 const TIER_RANK = { free: 0, hunter: 1, monarch: 2 };
 
 export const hasTierAccess = (activeTier, requiredTier = "hunter") =>
-  (TIER_RANK[activeTier] || 0) >= (TIER_RANK[requiredTier] || 1);
+  (TIER_RANK[activeTier] ?? 0) >= (TIER_RANK[requiredTier] ?? 1);

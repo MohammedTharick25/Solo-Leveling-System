@@ -7,7 +7,7 @@ import Hunter from "../hunter/hunter.model.js";
 import Stats from "../stats/stats.model.js";
 import * as authRepo from "./auth.repository.js";
 import { AppError } from "../../middleware/errorHandler.middleware.js";
-import { startOfDay, endOfDay } from "../../lib/helpers.js";
+import { getZonedDayBounds, normalizeTimeZone } from "../../lib/timeZones.js";
 import { createNotification } from "../notification/notification.service.js";
 import { sendEmail } from "../../lib/email/mailer.js";
 import { passwordResetEmail } from "../../lib/email/templates.js";
@@ -45,7 +45,8 @@ export const register = async ({ email, password, hunterName, request = null }) 
   const existingName = await User.findOne({ hunterName });
   if (existingName) throw new AppError("Hunter name already taken.", 409);
 
-  const user = await User.create({ email, password, hunterName });
+  const detectedTimezone = request?.headers?.["x-time-zone"];
+  const user = await User.create({ email, password, hunterName, timezone: normalizeTimeZone(detectedTimezone) });
   await bootstrapHunterProfile(user._id, hunterName);
 
   const sessionId = randomUUID();
@@ -70,6 +71,9 @@ export const login = async ({ email, password, request }) => {
   if (!isMatch) throw new AppError("Invalid email or password.", 401);
 
   user.lastLoginAt = new Date();
+  if (!user.timezoneSet && request?.headers?.["x-time-zone"]) {
+    user.timezone = normalizeTimeZone(request.headers["x-time-zone"]);
+  }
   await user.save({ validateBeforeSave: false });
 
   const sessionId = randomUUID();
@@ -241,8 +245,8 @@ export const claimDailyBonus = async (userId, io = null) => {
   const hunter = await Hunter.findOne({ userId });
   if (!hunter) return { alreadyClaimed: true, xpEarned: 0 };
 
-  const todayStart = startOfDay();
-  const todayEnd = endOfDay();
+  const user = await User.findById(userId).select("timezone").lean();
+  const { start: todayStart, end: todayEnd } = getZonedDayBounds(new Date(), normalizeTimeZone(user?.timezone));
 
   // Check if already claimed today using a lightweight marker
   const alreadyClaimedToday =

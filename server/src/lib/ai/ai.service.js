@@ -22,6 +22,7 @@ const callGroq = async ({ messages, json = false }) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20_000),
   });
 
   const payload = await response.json().catch(() => ({}));

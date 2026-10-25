@@ -17,9 +17,10 @@ import { useQuery } from "@tanstack/react-query"; // Fixed: Ensure useQuery is i
 
 // Stores & Logic
 import { useHunterStore } from "../../stores/hunterStore.js";
-import { STAT_LABELS, STAT_COLORS, STAT_ICONS } from "../../lib/xpFormulas.js";
+import { STAT_LABELS, STAT_GUIDANCE, STAT_COLORS, STAT_ICONS } from "../../lib/xpFormulas.js";
 import { pageVariants } from "../../lib/animations.js";
 import api from "../../lib/api.js";
+import { hasTierAccess } from "../../lib/planAccess.js";
 
 // Custom UI Components
 import { RankAura } from "../../components/ui/RankAura.jsx";
@@ -85,8 +86,15 @@ export default function HunterPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [playClick] = useSound("/sounds/click.mp3", { volume: 0.1 });
 
+  const { data: billing } = useQuery({
+    queryKey: ["billing-me"],
+    queryFn: async () => (await api.get("/billing/me")).data.data,
+    staleTime: 30_000,
+    retry: 1,
+  });
+
   // 2. Data Fetching (Called at top level)
-  const { data: profileData, isLoading } = useQuery({
+  const { data: profileData, isLoading, isError, refetch } = useQuery({
     queryKey: ["hunter-full-profile"],
     queryFn: async () => {
       const { data } = await api.get("/hunter/me");
@@ -108,6 +116,8 @@ export default function HunterPage() {
       const { data } = await api.get(`/analytics/heatmap?year=${currentYear}`);
       return data.data;
     },
+    // The profile itself is Free; only its advanced activity heatmap needs Hunter.
+    enabled: hasTierAccess(billing?.effectiveTier, "hunter"),
   });
 
   // 2. Add this helper function to format the data correctly
@@ -165,7 +175,13 @@ export default function HunterPage() {
 
   // Early return for loading or missing access
   if (isLoading && !hunter) return <PageLoader />;
-  if (!hunter || !user) return null;
+  if (!hunter) return (
+    <div className="mx-auto max-w-xl rounded-3xl border border-white/10 bg-slate-950/80 p-8 text-center">
+      <h1 className="font-heading text-xl font-bold text-white">Hunter profile unavailable</h1>
+      <p className="mt-2 text-sm leading-6 text-slate-400">{isError ? "The profile could not be loaded. Your account and plan are unchanged." : "Your profile is still being prepared."}</p>
+      {isError && <button type="button" onClick={() => refetch()} className="mt-5 rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-bold text-slate-950">Try again</button>}
+    </div>
+  );
 
   // 4. Logic Handlers
   const handleAvatarUpload = async (e) => {
@@ -448,6 +464,14 @@ export default function HunterPage() {
                           value={stats?.[key]?.value || 0}
                           color={STAT_COLORS[key]}
                         />
+                        <div className="mt-1 flex items-start justify-between gap-3">
+                          <p className="text-[9px] leading-4 text-slate-600">{STAT_GUIDANCE[key]}</p>
+                          {stats?.[key]?.history?.length > 0 && (
+                            <span className="shrink-0 text-[8px] font-bold text-emerald-400">
+                              +{Math.max(0, Number(stats[key].history.at(-1)?.value || 0) - Number(stats[key].history.at(-2)?.value ?? 10))} last gain
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

@@ -3,10 +3,13 @@ import cors from "cors";
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
 import cookieParser from "cookie-parser";
+import mongoose from "mongoose";
 
 import config from "./config/env.js";
 import { rateLimiter } from "./middleware/rateLimiter.middleware.js";
 import { errorHandler } from "./middleware/errorHandler.middleware.js";
+import { protect, requireAdmin } from "./middleware/auth.middleware.js";
+import { getOpsMetrics } from "./lib/opsMetrics.js";
 
 // Routes
 import authRoutes from "./modules/auth/auth.routes.js";
@@ -126,8 +129,21 @@ app.get("/health", (_req, res) => {
   });
 });
 
+app.get("/ready", (_req, res) => {
+  const databaseReady = mongoose.connection.readyState === 1;
+  res.status(databaseReady ? 200 : 503).json({
+    status: databaseReady ? "success" : "error",
+    checks: { database: databaseReady ? "connected" : "unavailable" },
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // ── API Routes ────────────────────────────────────────────────────────────────
 const API = "/api/v1";
+
+app.get(`${API}/ops/metrics`, protect, requireAdmin, (_req, res) => {
+  res.status(200).json({ status: "success", data: getOpsMetrics() });
+});
 
 app.use(`${API}/auth`, authRoutes);
 app.use(`${API}/users`, userRoutes);

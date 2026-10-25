@@ -47,6 +47,21 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom|@remix-run\/router)\//.test(id)) return "framework";
+          if (/node_modules\/(recharts|d3(?:-[^/]+)?|internmap|delaunator|robust-predicates)\//.test(id)) return "charts";
+          if (id.includes("/node_modules/framer-motion/")) return "motion";
+          if (id.includes("/node_modules/lucide-react/")) return "icons";
+          if (id.includes("/node_modules/@tanstack/")) return "query";
+          return undefined;
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

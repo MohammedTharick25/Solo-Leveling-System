@@ -48,6 +48,7 @@ const questSchema = new mongoose.Schema(
     },
     xpReward: { type: Number, required: true, min: 0 },
     earnedXP: { type: Number, default: 0, min: 0 },
+    xpPenalty: { type: Number, default: 0, min: 0 },
     statRewards: [
       {
         stat: String,
@@ -55,6 +56,27 @@ const questSchema = new mongoose.Schema(
         _id: false,
       },
     ],
+    targetStat: {
+      type: String,
+      enum: [
+        "strength", "agility", "intelligence", "vitality", "sense", "discipline",
+        "communication", "leadership", "creativity", "financialIntelligence",
+        "problemSolving", "emotionalControl", "timeManagement", null,
+      ],
+      default: null,
+    },
+    targetStatValue: { type: Number, min: 0, max: 100, default: null },
+    targetReason: { type: String, enum: ["main goal", "lowest stat", null], default: null },
+    recoveryHistory: [{
+      replacedTitle: String,
+      replacedDescription: String,
+      replacedCategory: String,
+      replacedTargetValue: Number,
+      replacedCurrentValue: Number,
+      replacedUnit: String,
+      replacedAt: Date,
+      _id: false,
+    }],
     expectedOutcome: String,
     generatedReason: String,
 
@@ -65,7 +87,7 @@ const questSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["active", "completed", "failed", "expired"],
+      enum: ["active", "completed", "failed", "expired", "recovered"],
       default: "active",
     },
     evolutionLevel: { type: Number, default: 1, min: 1 },
@@ -74,12 +96,14 @@ const questSchema = new mongoose.Schema(
     dueAt: { type: Date, required: true },
     completedAt: Date,
     failedAt: Date,
+    recoveredAt: Date,
   },
   { timestamps: true },
 );
 
-questSchema.index({ userId: 1, status: 1 });
 questSchema.index({ userId: 1, category: 1 });
-questSchema.index({ dueAt: 1, status: 1 });
+questSchema.index({ userId: 1, createdAt: 1 });
+questSchema.index({ userId: 1, status: 1, createdAt: -1, updatedAt: -1 });
+questSchema.index({ userId: 1, status: 1, dueAt: 1 });
 
 export default mongoose.model("Quest", questSchema);

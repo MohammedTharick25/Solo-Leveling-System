@@ -250,6 +250,11 @@ textarea, input, button, select { max-width: 100%; }
 .break-user-content { overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap; }
 .scroll-user-content { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 
+:where(button, a, [role="button"], input, select, textarea):focus-visible {
+  outline: 2px solid #67e8f9;
+  outline-offset: 2px;
+}
+
 
 /* Interaction + mobile safety layer */
 @layer utilities {

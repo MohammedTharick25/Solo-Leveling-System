@@ -1,6 +1,7 @@
 import { AppError } from "../../middleware/errorHandler.middleware.js";
 import { asyncHandler, sendSuccess } from "../../lib/helpers.js";
 import * as billingService from "./billing.service.js";
+import { recordOpsEvent } from "../../lib/opsMetrics.js";
 
 export const getPlans = asyncHandler(async (_req, res) => {
   sendSuccess(res, await billingService.getPlans(), "Billing plans retrieved.");
@@ -42,15 +43,21 @@ export const upgradeToMonarch = asyncHandler(async (req, res) => {
 });
 
 export const handleWebhook = asyncHandler(async (req, res) => {
-  if (!billingService.verifyWebhookSignature(req.rawBody, req.get("x-razorpay-signature"))) {
-    throw new AppError("Invalid Razorpay webhook signature.", 400);
-  }
-  let event;
   try {
-    event = JSON.parse(req.rawBody.toString("utf8"));
-  } catch {
-    throw new AppError("Invalid Razorpay webhook payload.", 400);
+    if (!billingService.verifyWebhookSignature(req.rawBody, req.get("x-razorpay-signature"))) {
+      throw new AppError("Invalid Razorpay webhook signature.", 400);
+    }
+    let event;
+    try {
+      event = JSON.parse(req.rawBody.toString("utf8"));
+    } catch {
+      throw new AppError("Invalid Razorpay webhook payload.", 400);
+    }
+    await billingService.processWebhook(event);
+    recordOpsEvent("billing_webhook", "event_processed", "success");
+    res.status(200).json({ status: "success", message: "Webhook received." });
+  } catch (error) {
+    recordOpsEvent("billing_webhook", "event_rejected_or_failed", "error", error);
+    throw error;
   }
-  await billingService.processWebhook(event);
-  res.status(200).json({ status: "success", message: "Webhook received." });
 });

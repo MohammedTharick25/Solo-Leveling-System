@@ -59,6 +59,8 @@ const userSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     country: { type: String, default: "Unknown", trim: true, maxlength: 80 },
     timezone: { type: String, default: "UTC", trim: true, maxlength: 100 },
+    timezoneSet: { type: Boolean, default: false },
+    dailyQuestGenerationLockUntil: { type: Date, default: null },
     bio: { type: String, default: "", trim: true, maxlength: 240 },
     billing: {
       tier: { type: String, enum: ["free", "hunter", "monarch"], default: "free" },
@@ -145,6 +147,7 @@ userSchema.methods.toSafeObject = function () {
   delete obj.password;
   delete obj.pushSubscriptions;
   delete obj.lastStreakReminderDate;
+  delete obj.dailyQuestGenerationLockUntil;
   return obj;
 };
 
