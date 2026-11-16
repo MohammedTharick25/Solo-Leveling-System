@@ -2,6 +2,8 @@ import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import config from "../../config/env.js";
 import User from "../../modules/user/user.model.js";
+import Guild from "../../modules/guild/guild.model.js";
+import mongoose from "mongoose";
 
 export const initSocket = (httpServer) => {
   const allowedOrigins = [
@@ -57,12 +59,15 @@ export const initSocket = (httpServer) => {
     socket.join(`user:${userId}`);
 
     // ── Guild rooms ──────────────────────────────────────────────────────────
-    socket.on("guild:join", (guildId) => {
-      if (guildId) {
+    socket.on("guild:join", async (guildId) => {
+      // Only actual members may listen to a guild room.
+      if (!mongoose.isValidObjectId(guildId)) return;
+      try {
+        const isMember = await Guild.exists({ _id: guildId, "members.userId": userId });
+        if (!isMember) return;
         socket.join(`guild:${guildId}`);
-        console.log(
-          `[SOCKET] ${socket.hunterName} joined guild room: ${guildId}`,
-        );
+      } catch {
+        /* membership check failed: do not join */
       }
     });
 

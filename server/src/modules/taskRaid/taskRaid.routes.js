@@ -17,9 +17,19 @@ const DIFFICULTY_XP = { F: 20, E: 40, D: 75, C: 120, B: 200, A: 320, S: 500 };
 
 // ── Service ───────────────────────────────────────────────────────────────────
 
+// Only these client-supplied fields may reach the database. Everything else
+// (userId, status, completedAt, xpReward, parentRaidId...) is set by the server.
+const RAID_INPUT_FIELDS = [
+  "title", "description", "category", "difficulty", "priority", "estimatedMinutes",
+  "dueAt", "subtasks", "notes", "tags", "recurringFrequency", "recurringDays",
+];
+export const pickRaidInput = (body = {}) =>
+  Object.fromEntries(RAID_INPUT_FIELDS.filter((k) => body[k] !== undefined).map((k) => [k, body[k]]));
+
 export const createRaid = async (userId, data) => {
-  const xpReward = DIFFICULTY_XP[data.difficulty] || 75;
-  return TaskRaid.create({ userId, ...data, xpReward });
+  const input = pickRaidInput(data);
+  const xpReward = DIFFICULTY_XP[input.difficulty] || 75;
+  return TaskRaid.create({ ...input, userId, xpReward });
 };
 
 export const getRaids = async (
@@ -230,10 +240,11 @@ router.post(
     validate,
   ],
   asyncHandler(async (req, res) => {
-    const xpReward = DIFFICULTY_XP[req.body.difficulty] || 75;
+    const input = pickRaidInput(req.body);
+    const xpReward = DIFFICULTY_XP[input.difficulty] || 75;
     const template = await TaskRaid.create({
+      ...input,
       userId: req.userId,
-      ...req.body,
       xpReward,
       isRecurring: true,
       isTemplate: true,

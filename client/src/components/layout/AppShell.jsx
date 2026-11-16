@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
+import { useReducedMotion } from "framer-motion";
 import Sidebar from "./Sidebar.jsx";
 import TopNav from "./TopNav.jsx";
 import { useQuery } from "@tanstack/react-query";
@@ -11,6 +12,7 @@ export default function AppShell() {
   const menuButtonRef = useRef(null);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const { user, setUser, setHunter, setStats, setSettings } = useHunterStore();
+  const reduceMotion = useReducedMotion();
 
   useQuery({
     queryKey: ["user-me", user?._id || user?.id || "current"],
@@ -74,10 +76,19 @@ export default function AppShell() {
 
         <main id="main-content" tabIndex={-1} className="flex-1 min-h-0 overflow-y-auto focus:outline-none">
           {/* Background radial glow */}
-          <div className="pointer-events-none fixed inset-0 bg-hero-gradient opacity-60" />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed inset-0 opacity-70"
+            style={{
+              background: "radial-gradient(ellipse at 86% 0%, rgb(var(--accent-300) / 16%), transparent 32%), radial-gradient(ellipse at 3% 78%, rgb(var(--accent-2) / 10%), transparent 34%)",
+              animation: reduceMotion ? "none" : "aurora-drift 22s var(--ease-in-out) infinite",
+            }}
+          />
 
           <div className="relative z-10 p-4 lg:p-6 max-w-7xl mx-auto">
-            <Outlet />
+            <div className="route-view">
+              <Outlet />
+            </div>
           </div>
         </main>
       </div>

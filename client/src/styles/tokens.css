@@ -1,0 +1,95 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS — single source of truth for color, shape, depth and motion.
+
+   Colors are stored as space-separated RGB triplets so Tailwind can apply
+   alpha:  rgb(var(--accent-400) / 0.4).
+
+   To add a palette: copy one [data-palette="..."] block below, change the
+   triplets, and register it in src/lib/palette.js. Nothing else changes.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Surfaces: ink with a faint blue-violet cast (darkest → lightest) ───── */
+  --surface-950: 6 8 18;
+  --surface-900: 11 14 28;
+  --surface-850: 16 20 38;
+  --surface-800: 23 28 50;
+  --surface-700: 38 45 74;
+
+  /* ── Ink (text) ─────────────────────────────────────────────────────────── */
+  --ink-600: 62 70 105;
+  --ink-500: 100 110 146;
+  --ink-400: 146 156 190;
+  --ink-300: 196 204 226;
+
+  /* ── Status (fixed across palettes so meaning never shifts) ─────────────── */
+  --success: 52 211 153;
+  --warning: 251 191 36;
+  --danger: 248 113 113;
+
+  /* ── Shape & depth ──────────────────────────────────────────────────────── */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-md: 0 8px 24px -8px rgb(0 0 0 / 0.55);
+  --shadow-lg: 0 24px 60px -20px rgb(0 0 0 / 0.65);
+  --edge-highlight: inset 0 1px 0 rgb(255 255 255 / 0.05);
+
+  /* ── Motion ─────────────────────────────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 480ms;
+
+  /* ── Default palette: "system" (azure + violet) ─────────────────────────── */
+  --accent-50: 239 248 255;
+  --accent-100: 219 240 255;
+  --accent-200: 181 227 255;
+  --accent-300: 130 207 255;
+  --accent-400: 74 182 255;
+  --accent-500: 31 155 245;
+  --accent-600: 18 120 214;
+  --accent-700: 16 94 170;
+  --accent-800: 17 74 133;
+  --accent-900: 18 58 103;
+  --accent-2: 167 139 250;
+}
+
+/* ── Palettes ───────────────────────────────────────────────────────────── */
+:root[data-palette="shadow"] {
+  --accent-50: 245 243 255; --accent-100: 237 233 254; --accent-200: 221 214 254;
+  --accent-300: 196 181 253; --accent-400: 167 139 250; --accent-500: 139 92 246;
+  --accent-600: 124 58 237;  --accent-700: 109 40 217;  --accent-800: 91 33 182;
+  --accent-900: 76 29 149;   --accent-2: 232 121 249;
+}
+:root[data-palette="ember"] {
+  --accent-50: 255 247 237; --accent-100: 255 237 213; --accent-200: 254 215 170;
+  --accent-300: 253 186 116; --accent-400: 251 146 60;  --accent-500: 249 115 22;
+  --accent-600: 234 88 12;   --accent-700: 194 65 12;   --accent-800: 154 52 18;
+  --accent-900: 124 45 18;   --accent-2: 251 113 133;
+}
+:root[data-palette="jade"] {
+  --accent-50: 236 253 245; --accent-100: 209 250 229; --accent-200: 167 243 208;
+  --accent-300: 110 231 183; --accent-400: 52 211 153;  --accent-500: 16 185 129;
+  --accent-600: 5 150 105;   --accent-700: 4 120 87;    --accent-800: 6 95 70;
+  --accent-900: 6 78 59;     --accent-2: 56 189 248;
+}
+
+/* ── Aliases: legacy variable names used across the app now follow the palette.
+      An equipped relic theme still wins because it sets these inline. ─────── */
+:root {
+  --app-accent-rgb: var(--accent-300);
+  --app-secondary-rgb: var(--accent-2);
+  --relic-accent-rgb: var(--accent-300);
+  --relic-secondary-rgb: var(--accent-2);
+  --hunter-accent-rgb: var(--accent-300);
+  --hunter-secondary-rgb: var(--accent-2);
+  --relic-accent: rgb(var(--accent-300));
+  --relic-secondary: rgb(var(--accent-2));
+  --app-accent: rgb(var(--accent-300));
+  --app-shell-bg: rgb(var(--surface-950));
+}

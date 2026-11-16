@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { forwardRef, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -293,7 +293,10 @@ function TabBtn({ active, onClick, icon: Icon, label }) {
   );
 }
 
-function QuestCard({ quest, stats, index, onComplete, onProgress, completing, completed }) {
+const QuestCard = forwardRef(function QuestCard(
+  { quest, stats, index, onComplete, onProgress, completing, completed },
+  ref,
+) {
   const [inputValue, setInputValue] = useState(quest.currentValue || 0);
   const [expanded, setExpanded] = useState(false);
   const cfg = CATEGORY_CONFIG[quest.category] || CATEGORY_CONFIG.default;
@@ -308,6 +311,7 @@ function QuestCard({ quest, stats, index, onComplete, onProgress, completing, co
 
   return (
     <motion.article
+      ref={ref}
       layout
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: completed ? 0.78 : 1, y: 0 }}
@@ -481,7 +485,7 @@ function QuestCard({ quest, stats, index, onComplete, onProgress, completing, co
       </div>
     </motion.article>
   );
-}
+});
 
 function InfoPill({ label, value, icon: Icon }) {
   return (

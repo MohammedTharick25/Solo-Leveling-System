@@ -109,8 +109,9 @@ export const getHunterContext = async (userId) => {
       category: goal.category,
       progress: goal.progress,
       targetDate: goal.targetDate,
-      nextMilestone: goal.milestones.find((milestone) => milestone.status !== "completed")?.title || null,
+      nextMilestone: (goal.milestones || []).find((milestone) => milestone.status !== "completed")?.title || null,
     })),
+    quests: quests.map(compactQuest),
     questSummary: {
       returned: quests.length,
       completed: completedQuests,

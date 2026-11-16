@@ -6,6 +6,7 @@ import { AnimatePresence } from "framer-motion";
 import { useHunterStore } from "../../stores/hunterStore.js";
 import { RANK_COLORS, formatXP } from "../../lib/xpFormulas.js";
 import NotificationPanel from "./NotificationPanel.jsx";
+import PaletteSwitcher from "../ui/PaletteSwitcher.jsx";
 
 export default function TopNav({ onMenuClick, menuOpen = false, menuButtonRef }) {
   const { hunter, unreadCount, settings } = useHunterStore();
@@ -37,8 +38,8 @@ export default function TopNav({ onMenuClick, menuOpen = false, menuButtonRef })
 
   return (
     <header
-      className="h-14 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/60
-                  flex items-center px-4 gap-4 shrink-0"
+      className="h-14 bg-slate-950/70 backdrop-blur-xl border-b border-white/[0.06]
+                  flex items-center px-4 gap-3 shrink-0"
       style={{ position: "relative", zIndex: 200 }}
     >
       {/* Mobile menu toggle */}
@@ -89,6 +90,8 @@ export default function TopNav({ onMenuClick, menuOpen = false, menuButtonRef })
           </span>
         </div>
       )}
+
+      <PaletteSwitcher />
 
       {/* Bell button + panel container */}
       {(!settings?.notifications || (settings.notifications.enabled !== false && settings.notifications.inApp !== false)) && (
